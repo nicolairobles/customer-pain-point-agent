@@ -1,0 +1,9 @@
+langchain
+openai
+streamlit
+praw
+tweepy
+google-api-python-client
+python-dotenv
+pytest
+pydantic
