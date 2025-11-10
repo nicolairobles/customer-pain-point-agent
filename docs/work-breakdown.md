@@ -1,5 +1,4 @@
 ### 2.05 Create WBS (Work Breakdown Structure)
-```
 DELIVERABLES
 
 1.0 PROJECT MANAGEMENT
@@ -31,11 +30,9 @@ DELIVERABLES
 ├── 5.2 Documentation
 ├── 5.3 Demo Video Creation
 └── 5.4 Team Knowledge Transfer
-```
 
 **ACTIVITY LIST (Week 1 - Detailed)**
 
-```
 PHASE 1: FOUNDATION 
 
 Activity ID: 1.1.1
@@ -231,4 +228,3 @@ Work Package: 2.4 (Deliverable acceptance)
 Duration: 0.5 hours
 Owner: Nicolai
 Story Link: [Detailed Story](https://github.com/nicolairobles/customer-pain-point-agent/blob/master/docs/stories/1.5.3-push-to-github.md)
-```
