@@ -44,6 +44,7 @@ Description: Initialize repo with folder structure, README template, .gitignore
 Work Package: 2.1.1 GitHub Repository Creation
 Duration: 0.5 hours
 Owner: Nicolai
+Story Link: [Detailed Story](./stories/1.1.1-create-github-repository.md)
 
 Activity ID: 1.1.2
 Activity: Set up Python virtual environment
@@ -52,6 +53,7 @@ Work Package: 2.1.2 Python Environment Configuration
 Duration: 0.5 hours
 Story Points: 3
 Owner: All team members (parallel)
+Story Link: [Detailed Story](./stories/1.1.2-set-up-python-virtual-environment.md)
 
 Activity ID: 1.1.3
 Activity: Obtain OpenAI API key
@@ -62,6 +64,7 @@ Duration: 0.25 hours
 Owner: Nicolai
 AC:
 - in .env file, private
+Story Link: [Detailed Story](./stories/1.1.3-obtain-openai-api-key.md)
 
 Activity ID: 1.1.4
 Activity: Obtain Reddit API credentials
@@ -72,6 +75,7 @@ Story Points: 1
 Owner: Nicolai
 AC:
 - in .env
+Story Link: [Detailed Story](./stories/1.1.4-obtain-reddit-api-credentials.md)
 
 Activity ID: 1.1.5
 Activity: Test API connections
@@ -79,6 +83,7 @@ Description: Run test scripts to verify OpenAI and Reddit APIs working
 Work Package: 2.1.4 Dependency Installation
 Duration: 0.5 hours
 Owner: Javier, Stefan, Edison
+Story Link: [Detailed Story](./stories/1.1.5-test-api-connections.md)
 
 Activity ID: 1.2.1
 Activity: Design Reddit API wrapper interface
@@ -87,6 +92,7 @@ Work Package: 2.2.1 Reddit API Wrapper Development
 Duration: 1 hour
 Story points: 3
 Owner: Stefan
+Story Link: [Detailed Story](./stories/1.2.1-design-reddit-api-wrapper-interface.md)
 
 Activity ID: 1.2.2
 Activity: Implement Reddit search functionality
@@ -95,6 +101,7 @@ Work Package: 2.2.2 Reddit Search Functionality
 Duration: 4 hours
 Story Points: 5
 Owner: Edison
+Story Link: [Detailed Story](./stories/1.2.2-implement-reddit-search-functionality.md)
 
 Activity ID: 1.2.3
 Activity: Implement Reddit data parsing
@@ -103,6 +110,7 @@ Work Package: 2.2.3 Data Parsing & Formatting
 Duration: 2 hours
 Story Points: 3
 Owner: Javier
+Story Link: [Detailed Story](./stories/1.2.3-implement-reddit-data-parsing.md)
 
 Activity ID: 1.2.4
 Activity: Write unit tests for Reddit tool
@@ -111,14 +119,16 @@ Work Package: 2.2.4 Unit Tests for Reddit Tool
 Duration: 2 hours
 Story Points: 3
 Owner: Amanda
+Story Link: [Detailed Story](./stories/1.2.4-write-unit-tests-for-reddit-tool.md)
 
-Activity ID: ?
+Activity ID: 1.3.0
 Activity: Set up Open AI LLM integration point
 Description: For LLM prompt interactions
-Work Package: ?
+Work Package: 2.3.0 LLM Integration Backbone
 Story Points: 3
 Duration: 1 hour
 Owner: Javier
+Story Link: [Detailed Story](./stories/1.3.0-set-up-openai-llm-integration-point.md)
 
 Activity ID: 1.3.1
 Activity: Design pain point extraction prompt
@@ -127,6 +137,7 @@ Work Package: 2.3.4 Pain Point Extraction with LLM
 Story Points: 
 Duration: 1 hour
 Owner: Javier
+Story Link: [Detailed Story](./stories/1.3.1-design-pain-point-extraction-prompt.md)
 
 ---- TO CONTINUE LATER
 
@@ -138,6 +149,7 @@ Work Package: 2.3.4 Pain Point Extraction with LLM
 Story Points: 
 Duration: 3 hours
 Owner: Javier
+Story Link: [Detailed Story](./stories/1.3.2-implement-pain-point-extractor.md)
 
 Activity ID: 1.3.3
 Activity: Initialize LangChain agent
@@ -145,6 +157,7 @@ Description: Set up agent with ChatOpenAI and tool list
 Work Package: 2.3.1 Agent Initialization
 Duration: 2 hours
 Owner: Stefan
+Story Link: [Detailed Story](./stories/1.3.3-initialize-langchain-agent.md)
 
 Activity ID: 1.3.4
 Activity: Register tools with agent
@@ -152,6 +165,7 @@ Description: Create Tool wrappers for Reddit search and extraction
 Work Package: 2.3.2 Tool Registration
 Duration: 2 hours
 Owner: Stefan
+Story Link: [Detailed Story](./stories/1.3.4-register-tools-with-agent.md)
 
 Activity ID: 1.3.5
 Activity: Implement agent query processing
@@ -159,6 +173,7 @@ Description: Create run() method that orchestrates tool calls
 Work Package: 2.3.3 Query Processing Logic
 Duration: 3 hours
 Owner: Stefan
+Story Link: [Detailed Story](./stories/1.3.5-implement-agent-query-processing.md)
 
 
 Activity ID: 1.4.1
@@ -167,6 +182,7 @@ Description: Sketch UI wireframes, define components
 Work Package: 2.4.1 UI Layout Design
 Duration: 1 hour
 Owner: Al
+Story Link: [Detailed Story](./stories/1.4.1-design-streamlit-ui-layout.md)
 
 Activity ID: 1.4.2
 Activity: Implement query input component
@@ -174,6 +190,7 @@ Description: Create text input and button in Streamlit
 Work Package: 2.4.2 Query Input Component
 Duration: 1 hour
 Owner: Al
+Story Link: [Detailed Story](./stories/1.4.2-implement-query-input-component.md)
 
 Activity ID: 1.4.3
 Activity: Implement results display component
@@ -181,6 +198,7 @@ Description: Format and display agent output in Streamlit
 Work Package: 2.4.3 Results Display Component
 Duration: 2 hours
 Owner: Al
+Story Link: [Detailed Story](./stories/1.4.3-implement-results-display-component.md)
 
 Activity ID: 1.4.4
 Activity: Add basic styling
@@ -188,6 +206,7 @@ Description: Apply colors, fonts, layout improvements
 Work Package: 2.4.4 Basic Styling
 Duration: 1 hour
 Owner: Al
+Story Link: [Detailed Story](./stories/1.4.4-add-basic-styling.md)
 
 Activity ID: 1.5.1
 Activity: End-to-end testing
@@ -195,6 +214,7 @@ Description: Test complete flow from query to results
 Work Package: 2.4 (Deliverable acceptance)
 Duration: 1 hour
 Owner: Amanda
+Story Link: [Detailed Story](./stories/1.5.1-end-to-end-testing.md)
 
 Activity ID: 1.5.2
 Activity: Code review
@@ -202,6 +222,7 @@ Description: Review all code for quality and documentation
 Work Package: 2.4 (Deliverable acceptance)
 Duration: 2 hours
 Owner: Nicolai
+Story Link: [Detailed Story](./stories/1.5.2-code-review.md)
 
 Activity ID: 1.5.3
 Activity: Push to GitHub
@@ -209,4 +230,5 @@ Description: Commit all code with descriptive messages
 Work Package: 2.4 (Deliverable acceptance)
 Duration: 0.5 hours
 Owner: Nicolai
+Story Link: [Detailed Story](./stories/1.5.3-push-to-github.md)
 ```
