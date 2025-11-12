@@ -27,6 +27,7 @@ pytest.cache/
 
 # Environment files
 .env
+.env.example
 .env.local
 
 # Logs
