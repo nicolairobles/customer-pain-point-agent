@@ -117,3 +117,8 @@ done
 
 # ./issues/create_github_issues.sh 1.1.4 → creates the issue only if it doesn’t already exist.
 # ./issues/create_github_issues.sh --update 1.1.4 → replaces the issue body if it already exists (skips if it doesn’t).
+
+# Retain generated issue bodies locally:
+# To avoid bloating git history, remove tracked files and regenerate as needed.
+# git rm -r issues/generated
+# echo "issues/generated/" >> .gitignore
