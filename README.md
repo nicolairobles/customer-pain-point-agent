@@ -41,7 +41,10 @@ Refer to `docs/architecture.md` for detailed architectural guidance.
 ## **Reddit Tool Example**
 
 - **Example Output File**: `examples/reddit_tool_example_output.json` — a saved, sanitized sample of `RedditTool` output.
-- **Quick Run (debug)**: `python scripts/run_reddit_tool_debug.py` — prints sanitized JSON to stdout.
+- **Quick Run (debug)**: prints sanitized JSON to stdout. 
+```bash
+python scripts/run_reddit_tool_debug.py
+``` 
 - **Quick Run (CLI)**: `python scripts/run_reddit_tool_cli.py --query "python decorators" --subreddits python --limit 3 --per-subreddit 3 --time-filter week`
 
 - **Usage Notes**: Ensure you have populated `.env` from `.env.example` with `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET`, and `REDDIT_USER_AGENT` before running the scripts.
