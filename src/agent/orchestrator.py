@@ -17,6 +17,7 @@ def build_agent_executor(settings: Settings) -> Any:
     """
 
     try:
+        import langchain as _langchain
         from langchain.agents import AgentExecutor, initialize_agent  # type: ignore
         from langchain.tools import BaseTool  # type: ignore
     except Exception as exc:  # pragma: no cover - environment specific
@@ -24,6 +25,23 @@ def build_agent_executor(settings: Settings) -> Any:
             "Failed to import required classes from langchain. "
             "Ensure you have a compatible langchain version installed or pin a working version in requirements.txt."
         ) from exc
+
+    # Log LangChain version for diagnostic purposes when the agent is built.
+    try:
+        _lc_ver = getattr(_langchain, "__version__", None)
+        if _lc_ver is None:
+            # Fallback to importlib.metadata if available
+            try:
+                from importlib import metadata as _metadata
+
+                _lc_ver = _metadata.version("langchain")
+            except Exception:
+                _lc_ver = "unknown"
+        import logging
+
+        logging.getLogger(__name__).info("Using langchain version=%s", _lc_ver)
+    except Exception:
+        pass
 
     tools = _load_tools(settings)
     agent = initialize_agent(
