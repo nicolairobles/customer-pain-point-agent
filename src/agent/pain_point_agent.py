@@ -4,14 +4,11 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
-from langchain.agents import AgentExecutor
-from langchain.schema import BaseMessage
-
 from config.settings import settings
 from src.agent.orchestrator import build_agent_executor
 
 
-def create_agent() -> AgentExecutor:
+def create_agent() -> Any:
     """Instantiate and return the configured LangChain agent executor."""
 
     return build_agent_executor(settings)
@@ -50,7 +47,7 @@ def _normalize_response(raw_result: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def stream_agent(query: str) -> List[BaseMessage]:
+def stream_agent(query: str) -> List[Any]:
     """Stream the agent's intermediate messages for interactive UIs."""
 
     executor = create_agent()
