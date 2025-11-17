@@ -86,10 +86,25 @@ class RedditTool(BaseTool):
         while attempt <= retries:
             try:
                 subreddit = self._client.subreddit(subreddit_name)
-                # Use relevance-based search; PRAW supports `time_filter` and `sort`.
+                # Measure fetch duration to help detect slow or rate-limited calls.
+                t0 = time.time()
                 submissions = subreddit.search(query, limit=limit, sort="relevance", time_filter=time_filter)
+                t1 = time.time()
                 results = [self._normalize_submission(s) for s in submissions]
-                _LOG.debug("Fetched %d items from r/%s", len(results), subreddit_name)
+                _LOG.debug(
+                    "Fetched %d items from r/%s in %.2f seconds",
+                    len(results), subreddit_name, t1 - t0,
+                )
+
+                # If the reddit client exposes rate limit info, log it for diagnostics.
+                try:
+                    rl = getattr(self._client, "auth", None)
+                    if rl is not None:
+                        _LOG.debug("Reddit auth info: %s", getattr(rl, "limits", "<no-limits>"))
+                except Exception:
+                    # Non-fatal: presence of rate-limit attributes varies by PRAW version
+                    pass
+
                 return results
             except Exception as exc:
                 _LOG.warning("Error fetching r/%s (attempt %d/%d): %s", subreddit_name, attempt + 1, retries + 1, exc)
