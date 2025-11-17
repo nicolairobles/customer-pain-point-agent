@@ -2,19 +2,28 @@
 
 from __future__ import annotations
 
-from typing import Iterable, List
-
-from langchain.agents import AgentExecutor, initialize_agent
-from langchain.tools import BaseTool
+from typing import Any, Iterable, List
 
 from config.settings import Settings
-from src.tools.google_search_tool import GoogleSearchTool
-from src.tools.reddit_tool import RedditTool
-from src.tools.twitter_tool import TwitterTool
 
 
-def build_agent_executor(settings: Settings) -> AgentExecutor:
-    """Construct an AgentExecutor configured with project tools and prompts."""
+def build_agent_executor(settings: Settings) -> Any:
+    """Construct an AgentExecutor configured with project tools and prompts.
+
+    LangChain imports are deferred until this function is called so that the
+    module can be imported in environments with incompatible LangChain
+    versions (tests, static analysis, etc.). If LangChain is missing or the
+    public API changed, an informative ImportError is raised.
+    """
+
+    try:
+        from langchain.agents import AgentExecutor, initialize_agent  # type: ignore
+        from langchain.tools import BaseTool  # type: ignore
+    except Exception as exc:  # pragma: no cover - environment specific
+        raise ImportError(
+            "Failed to import required classes from langchain. "
+            "Ensure you have a compatible langchain version installed or pin a working version in requirements.txt."
+        ) from exc
 
     tools = _load_tools(settings)
     agent = initialize_agent(
@@ -27,14 +36,22 @@ def build_agent_executor(settings: Settings) -> AgentExecutor:
     return AgentExecutor(agent=agent.agent, tools=tools, verbose=True)
 
 
-def _load_tools(settings: Settings) -> List[BaseTool]:
+def _load_tools(settings: Settings) -> List[Any]:
     """Instantiate tool set with shared configuration."""
 
     return list(_iter_tools(settings))
 
 
-def _iter_tools(settings: Settings) -> Iterable[BaseTool]:
-    """Yield configured LangChain tools for the agent."""
+def _iter_tools(settings: Settings) -> Iterable[Any]:
+    """Yield configured LangChain tools for the agent.
+
+    Import tool implementations here to avoid triggering their module-level
+    side-effects (pydantic model construction) during test collection.
+    """
+
+    from src.tools.reddit_tool import RedditTool
+    from src.tools.twitter_tool import TwitterTool
+    from src.tools.google_search_tool import GoogleSearchTool
 
     yield RedditTool.from_settings(settings)
     yield TwitterTool.from_settings(settings)
