@@ -12,12 +12,15 @@ from config.settings import Settings
 class TwitterTool(BaseTool):
     """Fetches relevant Twitter posts based on a user query."""
 
-    name = "twitter_search"
-    description = "Search Twitter for discussions related to customer pain points."
+    name: str = "twitter_search"
+    description: str = "Search Twitter for discussions related to customer pain points."
+
+    settings: Any = None
 
     def __init__(self, settings: Settings) -> None:
-        super().__init__()
-        self.settings = settings
+        # Initialize pydantic/model fields via super().__init__ so assignment
+        # respects BaseTool's model semantics.
+        super().__init__(settings=settings)
         # Initialize Twitter client here when implementing
 
     @classmethod
