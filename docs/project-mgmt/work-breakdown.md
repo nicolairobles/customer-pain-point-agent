@@ -296,3 +296,174 @@ Owner: Nicolai
 Story Link:
 ```
 [Detailed Story](https://github.com/nicolairobles/customer-pain-point-agent/blob/master/docs/stories/1.5.3-push-to-github.md)
+
+```
+Activity ID: 2.1.1
+Activity: Design Twitter API wrapper interface
+Description: Define signatures, configuration, and schema for Twitter integration
+Work Package: 3.1.1 Twitter Wrapper Design
+Duration: 1 hour
+Story Points: 3
+Owner: Stefan
+Story Link:
+```
+[Detailed Story](https://github.com/nicolairobles/customer-pain-point-agent/blob/master/docs/stories/2.1.1-design-twitter-api-wrapper-interface.md)
+
+```
+Activity ID: 2.1.2
+Activity: Implement Twitter search functionality
+Description: Build Twitter tool that queries tweets with filters and logging
+Work Package: 3.1.2 Twitter Search Implementation
+Duration: 4 hours
+Story Points: 5
+Owner: Edison
+Story Link:
+```
+[Detailed Story](https://github.com/nicolairobles/customer-pain-point-agent/blob/master/docs/stories/2.1.2-implement-twitter-search-functionality.md)
+
+```
+Activity ID: 2.1.3
+Activity: Implement Twitter data parsing
+Description: Normalize tweet payloads into shared schema
+Work Package: 3.1.3 Twitter Data Parsing
+Duration: 3 hours
+Story Points: 3
+Owner: Javier
+Story Link:
+```
+[Detailed Story](https://github.com/nicolairobles/customer-pain-point-agent/blob/master/docs/stories/2.1.3-implement-twitter-data-parsing.md)
+
+```
+Activity ID: 2.1.4
+Activity: Write unit tests for Twitter tool
+Description: Cover success, failure, and normalization cases for Twitter integration
+Work Package: 3.1.4 Twitter Tool Testing
+Duration: 2 hours
+Story Points: 2
+Owner: Amanda
+Story Link:
+```
+[Detailed Story](https://github.com/nicolairobles/customer-pain-point-agent/blob/master/docs/stories/2.1.4-write-unit-tests-for-twitter-tool.md)
+
+```
+Activity ID: 2.2.1
+Activity: Configure Google Custom Search
+Description: Set up API credentials, environment, and smoke tests
+Work Package: 3.2.1 Google Search Configuration
+Duration: 1 hour
+Story Points: 2
+Owner: Nicolai
+Story Link:
+```
+[Detailed Story](https://github.com/nicolairobles/customer-pain-point-agent/blob/master/docs/stories/2.2.1-configure-google-custom-search.md)
+
+```
+Activity ID: 2.2.2
+Activity: Implement Google search tool
+Description: Query Custom Search API and return normalized web results
+Work Package: 3.2.2 Google Search Implementation
+Duration: 4 hours
+Story Points: 5
+Owner: Edison
+Story Link:
+```
+[Detailed Story](https://github.com/nicolairobles/customer-pain-point-agent/blob/master/docs/stories/2.2.2-implement-google-search-tool.md)
+
+```
+Activity ID: 2.2.3
+Activity: Implement Google data parsing
+Description: Clean and normalize Google result payloads
+Work Package: 3.2.3 Google Data Parsing
+Duration: 3 hours
+Story Points: 3
+Owner: Javier
+Story Link:
+```
+[Detailed Story](https://github.com/nicolairobles/customer-pain-point-agent/blob/master/docs/stories/2.2.3-implement-google-data-parsing.md)
+
+```
+Activity ID: 2.2.4
+Activity: Write unit tests for Google tool
+Description: Add regression suite for Google search integration
+Work Package: 3.2.4 Google Tool Testing
+Duration: 2 hours
+Story Points: 2
+Owner: Amanda
+Story Link:
+```
+[Detailed Story](https://github.com/nicolairobles/customer-pain-point-agent/blob/master/docs/stories/2.2.4-write-unit-tests-for-google-tool.md)
+
+```
+Activity ID: 2.3.1
+Activity: Register new tools with agent
+Description: Add Twitter and Google tools to agent configuration with guards
+Work Package: 3.3.1 Agent Tool Registration
+Duration: 2 hours
+Story Points: 3
+Owner: Stefan
+Story Link:
+```
+[Detailed Story](https://github.com/nicolairobles/customer-pain-point-agent/blob/master/docs/stories/2.3.1-register-new-tools-with-agent.md)
+
+```
+Activity ID: 2.3.2
+Activity: Implement cross-source aggregation
+Description: Merge, deduplicate, and score multi-source results
+Work Package: 3.3.2 Cross-Source Aggregation
+Duration: 3 hours
+Story Points: 5
+Owner: Javier
+Story Link:
+```
+[Detailed Story](https://github.com/nicolairobles/customer-pain-point-agent/blob/master/docs/stories/2.3.2-implement-cross-source-aggregation.md)
+
+```
+Activity ID: 2.3.3
+Activity: Add multi-source resilience
+Description: Introduce concurrency controls, timeouts, and fallbacks
+Work Package: 3.3.3 Resilience & Concurrency
+Duration: 3 hours
+Story Points: 3
+Owner: Nicolai
+Story Link:
+```
+[Detailed Story](https://github.com/nicolairobles/customer-pain-point-agent/blob/master/docs/stories/2.3.3-add-multi-source-resilience.md)
+
+```
+Activity ID: 2.4.1
+Activity: Add source and time filters
+Description: Enhance UI with filter controls and validation
+Work Package: 3.4.1 Filter Enhancements
+Duration: 2 hours
+Story Points: 3
+Owner: Al
+Story Link:
+```
+[Detailed Story](https://github.com/nicolairobles/customer-pain-point-agent/blob/master/docs/stories/2.4.1-add-source-and-time-filters.md)
+
+```
+Activity ID: 2.4.2
+Activity: Implement results export
+Description: Provide CSV/JSON export options in UI
+Work Package: 3.4.2 Export Functionality
+Duration: 2 hours
+Story Points: 3
+Owner: Al
+Story Link:
+```
+[Detailed Story](https://github.com/nicolairobles/customer-pain-point-agent/blob/master/docs/stories/2.4.2-implement-results-export.md)
+
+```
+Activity ID: 2.4.3
+Activity: Enhance UI feedback and status messaging
+Description: Add loading states, partial results banners, and cost indicators
+Work Package: 3.4.3 UI Feedback Enhancements
+Duration: 2 hours
+Story Points: 3
+Owner: Al
+Story Link:
+```
+[Detailed Story](https://github.com/nicolairobles/customer-pain-point-agent/blob/master/docs/stories/2.4.3-enhance-ui-feedback.md)
+
+```
+
