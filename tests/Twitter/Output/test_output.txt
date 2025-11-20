@@ -1,0 +1,22 @@
+--- get_tweet_by_id ---
+NormalizedTweet(id='12345', text='Hello world mock tweet!', author_username='mock_user', permalink='https://twitter.com/mock_user/status/12345', created_at='2023-01-01T00:00:00Z', like_count=10, repost_count=2, reply_count=1, language='en', raw={'mock': True})
+
+--- get_tweets_by_ids ---
+NormalizedTweet(id='1', text='Hello world mock tweet!', author_username='mock_user', permalink='https://twitter.com/mock_user/status/1', created_at='2023-01-01T00:00:00Z', like_count=10, repost_count=2, reply_count=1, language='en', raw={'mock': True})
+NormalizedTweet(id='2', text='Hello world mock tweet!', author_username='mock_user', permalink='https://twitter.com/mock_user/status/2', created_at='2023-01-01T00:00:00Z', like_count=10, repost_count=2, reply_count=1, language='en', raw={'mock': True})
+NormalizedTweet(id='3', text='Hello world mock tweet!', author_username='mock_user', permalink='https://twitter.com/mock_user/status/3', created_at='2023-01-01T00:00:00Z', like_count=10, repost_count=2, reply_count=1, language='en', raw={'mock': True})
+
+--- search_recent_tweets ---
+NormalizedTweet(id='search_0', text='Hello world mock tweet!', author_username='mock_user', permalink='https://twitter.com/mock_user/status/search_0', created_at='2023-01-01T00:00:00Z', like_count=10, repost_count=2, reply_count=1, language='en', raw={'mock': True})
+NormalizedTweet(id='search_1', text='Hello world mock tweet!', author_username='mock_user', permalink='https://twitter.com/mock_user/status/search_1', created_at='2023-01-01T00:00:00Z', like_count=10, repost_count=2, reply_count=1, language='en', raw={'mock': True})
+NormalizedTweet(id='search_2', text='Hello world mock tweet!', author_username='mock_user', permalink='https://twitter.com/mock_user/status/search_2', created_at='2023-01-01T00:00:00Z', like_count=10, repost_count=2, reply_count=1, language='en', raw={'mock': True})
+
+--- get_user_timeline ---
+NormalizedTweet(id='timeline_0', text='Hello world mock tweet!', author_username='mock_user', permalink='https://twitter.com/mock_user/status/timeline_0', created_at='2023-01-01T00:00:00Z', like_count=10, repost_count=2, reply_count=1, language='en', raw={'mock': True})
+NormalizedTweet(id='timeline_1', text='Hello world mock tweet!', author_username='mock_user', permalink='https://twitter.com/mock_user/status/timeline_1', created_at='2023-01-01T00:00:00Z', like_count=10, repost_count=2, reply_count=1, language='en', raw={'mock': True})
+
+--- get_user_by_username ---
+{'id': 'user123', 'name': 'Mock User', 'username': 'mock_user', 'raw': {'mock': True}}
+
+--- raw_request ---
+{'endpoint': 'fake_endpoint', 'params': {'q': 'test'}, 'mock': True}
