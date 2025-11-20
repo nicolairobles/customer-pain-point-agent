@@ -3,13 +3,17 @@
 Run a debug call to the RedditTool and show full output/traceback.
 """
 
-from dotenv import load_dotenv
 import json
+import pathlib
+import sys
 import traceback
-import sys, pathlib
+
+from dotenv import load_dotenv
+
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
+
 from config.settings import settings
 from src.tools.reddit_tool import RedditTool
 
@@ -50,7 +54,7 @@ def main():
     try:
         results = tool._run(
             "python decorators",
-            subreddits=["python", "learnprogramming", "programming"],
+            subreddits=["all"],
             limit=15,
             per_subreddit=10,
             time_filter="week"  # try changing to None or 'day' if this errors
