@@ -66,6 +66,21 @@ class RedditTool(BaseTool):
 
     def _normalize_submission(self, submission: Any) -> Dict[str, Any]:
         """Extract required fields from a PRAW Submission-like object."""
+        # Normalize subreddit to a string. PRAW may return a Subreddit object
+        # which is not JSON serializable; prefer `subreddit_name_prefixed`,
+        # fall back to `str(submission.subreddit)` when needed.
+        sub_attr = getattr(submission, "subreddit", None)
+        if isinstance(sub_attr, str):
+            subreddit_str = sub_attr
+        else:
+            subreddit_str = getattr(submission, "subreddit_name_prefixed", None)
+            if subreddit_str is None and sub_attr is not None:
+                try:
+                    subreddit_str = str(sub_attr)
+                except Exception:
+                    subreddit_str = None
+        if subreddit_str is None:
+            subreddit_str = ""
 
         return {
             "id": getattr(submission, "id", ""),
@@ -74,7 +89,7 @@ class RedditTool(BaseTool):
             "upvotes": int(getattr(submission, "score", 0) or 0),
             "comments": int(getattr(submission, "num_comments", 0) or 0),
             "url": getattr(submission, "url", ""),
-            "subreddit": getattr(submission, "subreddit", "") if isinstance(getattr(submission, "subreddit", ""), str) else getattr(submission, "subreddit", getattr(submission, "subreddit_name_prefixed", "")),
+            "subreddit": subreddit_str,
             "timestamp": float(getattr(submission, "created_utc", 0) or 0),
         }
 
