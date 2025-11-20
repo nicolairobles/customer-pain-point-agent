@@ -98,3 +98,23 @@ def test_reddit_tool_sorting_by_relevance(monkeypatch, settings):
 
     assert results[0]["title"] == "High"
     assert results[1]["title"] == "Low"
+
+
+def test_subreddit_coercion_for_non_string_objects(monkeypatch, settings):
+    # Submission.subreddit is an object (not a string); ensure it's coerced to str
+    class FakeSubObj:
+        def __str__(self):
+            return "r/fakesub"
+
+    items = [
+        DummySubmission("b1", "Title", "b", 1, 0, "u", FakeSubObj(), 1600000000),
+    ]
+
+    client = DummyRedditClient({"python": DummySubreddit(items), "learnprogramming": DummySubreddit([]), "programming": DummySubreddit([])})
+    monkeypatch.setattr("src.tools.reddit_tool.praw.Reddit", lambda **kw: client)
+
+    tool = RedditTool.from_settings(settings)
+    results = tool._run("q", subreddits=["python"], limit=10, per_subreddit=10)
+
+    assert len(results) == 1
+    assert results[0]["subreddit"] == "r/fakesub"
