@@ -185,7 +185,7 @@ class RedditTool(BaseTool):
         - time_filter: Optional[str] forwarded to PRAW (e.g., 'day','week','month')
         """
 
-        subreddits = kwargs.get("subreddits") or ["python", "learnprogramming", "programming"]
+        subreddits = kwargs.get("subreddits") or ["all"]
         total_limit = int(kwargs.get("limit", 15))
         total_limit = max(1, min(total_limit, 20))
         per_subreddit = int(kwargs.get("per_subreddit", 10))
