@@ -124,6 +124,11 @@ class RedditTool(BaseTool):
             except Exception as exc:
                 _LOG.warning("Error fetching r/%s (attempt %d/%d): %s", subreddit_name, attempt + 1, retries + 1, exc)
                 attempt += 1
+                # If we've exhausted retries, avoid sleeping unnecessarily
+                # before exiting the loop.
+                if attempt > retries:
+                    break
+
                 time.sleep(backoff)
                 backoff *= 2
 
