@@ -1,6 +1,6 @@
 """Utilities for building the pain point extraction prompt.
 
-This module centralises the prompt text so that every part of the system
+This module centralizes the prompt text so that every part of the system
 produces identical instructions for OpenAI.  The helper functions emit a
 documented JSON schema to keep the downstream parsing logic in sync with the
 LLM output.
@@ -46,9 +46,7 @@ def format_documents_for_prompt(documents: Iterable[Mapping[str, str]]) -> str:
             bullet.append(f"   - Summary: {summary}")
         if content:
             bullet.append("   - Content:")
-            bullet.append(
-                indent(content.replace("\n", "\n     "), prefix="     ")
-            )
+            bullet.append(indent(content, prefix="     "))
         lines.append("\n".join(bullet))
     return "\n".join(lines)
 

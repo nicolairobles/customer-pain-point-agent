@@ -5,8 +5,6 @@ from __future__ import annotations
 import json
 from textwrap import dedent
 
-import pytest
-
 from src.extractors.pain_point_extractor import PainPoint
 from src.extractors.prompts import (
     PAIN_POINT_PROMPT_VERSION,
