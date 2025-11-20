@@ -66,21 +66,8 @@ class RedditTool(BaseTool):
 
     def _normalize_submission(self, submission: Any) -> Dict[str, Any]:
         """Extract required fields from a PRAW Submission-like object."""
-        # Normalize subreddit to a string. PRAW may return a Subreddit object
-        # which is not JSON serializable; prefer `subreddit_name_prefixed`,
-        # fall back to `str(submission.subreddit)` when needed.
-        sub_attr = getattr(submission, "subreddit", None)
-        if isinstance(sub_attr, str):
-            subreddit_str = sub_attr
-        else:
-            subreddit_str = getattr(submission, "subreddit_name_prefixed", None)
-            if subreddit_str is None and sub_attr is not None:
-                try:
-                    subreddit_str = str(sub_attr)
-                except Exception:
-                    subreddit_str = None
-        if subreddit_str is None:
-            subreddit_str = ""
+        # Normalize subreddit to a string using helper.
+        subreddit_str = self._extract_subreddit(submission)
 
         return {
             "id": getattr(submission, "id", ""),
@@ -92,6 +79,34 @@ class RedditTool(BaseTool):
             "subreddit": subreddit_str,
             "timestamp": float(getattr(submission, "created_utc", 0) or 0),
         }
+
+    def _extract_subreddit(self, submission: Any) -> str:
+        """Return a normalized subreddit string for a submission.
+
+        Handles cases where `submission.subreddit` may be a string, a PRAW
+        Subreddit-like object, or missing. Preference order:
+        1. If `subreddit` is a string, return it.
+        2. If `subreddit_name_prefixed` is present, return it.
+        3. Otherwise, attempt `str(subreddit)` and fall back to empty string.
+        """
+        sub_attr = getattr(submission, "subreddit", None)
+
+        if isinstance(sub_attr, str):
+            return sub_attr
+
+        # Try explicit prefixed name first (common on PRAW submissions)
+        pref = getattr(submission, "subreddit_name_prefixed", None)
+        if pref:
+            return pref
+
+        # Fall back to stringifying the object if present
+        if sub_attr is not None:
+            try:
+                return str(sub_attr)
+            except Exception:
+                _LOG.debug("Failed to stringify subreddit object: %r", sub_attr)
+
+        return ""
 
     def _fetch_subreddit(self, subreddit_name: str, query: str, limit: int, time_filter: Optional[str], retries: int = 2) -> List[Dict[str, Any]]:
         """Fetch search results for a single subreddit with simple retry/backoff."""
