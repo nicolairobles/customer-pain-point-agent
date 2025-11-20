@@ -49,7 +49,7 @@ python scripts/run_reddit_tool_debug.py
 ```
 ### Quick Run (debug) With sample output
 ```bash
-python .\scripts\run_reddit_tool_debug.py > .\examples\debug_output.json
+python scripts/run_reddit_tool_debug.py > examples/debug_output.json
 ``` 
 ### Quick Run (CLI) 
 ```bash
