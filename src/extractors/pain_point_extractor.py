@@ -23,7 +23,7 @@ class PainPoint(BaseModel):
 
     name: str
     description: str
-    frequency: str = Field(regex=r"^(high|medium|low)$")
+    frequency: str = Field(pattern=r"^(high|medium|low)$")
     examples: List[str]
     sources: List[PainPointSource]
 
