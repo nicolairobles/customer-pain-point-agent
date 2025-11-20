@@ -10,7 +10,7 @@ from typing import Any, Callable, Optional
 
 from openai import AsyncOpenAI, OpenAI, OpenAIError
 
-from config.settings import LLMSettings, Settings
+from config.settings import Settings
 
 LOGGER = logging.getLogger(__name__)
 
@@ -118,7 +118,7 @@ class OpenAIService:
     # Internal helpers
     # -------------------------------------------------------------------------
     def _effective_model(self, override: Optional[str]) -> str:
-        return override or self._settings.model
+        return override if override is not None else self._settings.model
 
     def _effective_temperature(self, override: Optional[float]) -> float:
         return (
@@ -128,7 +128,7 @@ class OpenAIService:
         )
 
     def _effective_max_tokens(self, override: Optional[int]) -> int:
-        value = override or self._settings.max_output_tokens
+        value = override if override is not None else self._settings.max_output_tokens
         return max(16, value)
 
     def _log_request(self, model: str, prompt: str, attempt: int) -> None:
@@ -168,7 +168,7 @@ class OpenAIService:
 
     def _extract_text(self, response: Any) -> str:
         text = getattr(response, "output_text", None)
-        if text:
+        if text is not None:
             return text
 
         # Fallback for structured content; gather text entries if available.

@@ -5,8 +5,6 @@ from __future__ import annotations
 import json
 from typing import Any, Dict, List
 
-import pytest
-
 from src.extractors.pain_point_extractor import (
     PainPoint,
     PainPointSource,

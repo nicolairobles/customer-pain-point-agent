@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any, Dict, Iterable, Iterator, List, Mapping, MutableMapping, Sequence
+from typing import Any, Dict, Iterable, Iterator, List, Mapping, Sequence
 
 from pydantic import BaseModel, Field, ValidationError
 
@@ -107,7 +107,7 @@ def _parse_llm_response(result: LLMResult) -> List[PainPoint]:
         LOGGER.warning("Failed to decode LLM response as JSON: %s", exc)
         return []
 
-    raw_points = payload.get("pain_points", []) if isinstance(payload, MutableMapping) else []
+    raw_points = payload.get("pain_points", []) if isinstance(payload, Mapping) else []
     parsed: List[PainPoint] = []
     for entry in raw_points:
         try:
