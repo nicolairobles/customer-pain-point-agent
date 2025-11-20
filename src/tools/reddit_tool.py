@@ -138,8 +138,16 @@ class RedditTool(BaseTool):
         for lst in lists:
             for item in lst:
                 item_id = item.get("id")
-                if item_id and item_id in seen:
+                # Explicitly skip items that don't have a valid id (None or empty
+                # string). If we allow falsy ids through, multiple items without
+                # ids can be added and will not be deduplicated.
+                if not item_id:
+                    _LOG.debug("Skipping item without id during merge: %s", item)
                     continue
+
+                if item_id in seen:
+                    continue
+
                 seen.add(item_id)
                 merged.append(item)
 
