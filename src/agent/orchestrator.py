@@ -21,9 +21,19 @@ def build_agent_executor(settings: Settings) -> Any:
         from langchain.agents import AgentExecutor, initialize_agent  # type: ignore
         from langchain.tools import BaseTool  # type: ignore
     except Exception as exc:  # pragma: no cover - environment specific
+        # Be explicit about likely causes: missing package, incompatible
+        # version, or changes to the public API. `requirements.txt` already
+        # contains a broad constraint (`langchain>=0.0.200,<1`), so if you've
+        # installed from a newer or older source, check the installed
+        # `langchain.__version__` and confirm it matches the project's
+        # compatibility. Pin a known-working version if necessary.
         raise ImportError(
-            "Failed to import required classes from langchain. "
-            "Ensure you have a compatible langchain version installed or pin a working version in requirements.txt."
+            "Failed to import required classes from langchain. This can happen if "
+            "the package is not installed, or the installed `langchain` version is "
+            "incompatible with this code. Check `pip show langchain` (or inspect "
+            "`langchain.__version__`) and ensure it satisfies the project's constraint "
+            "(e.g. `langchain>=0.0.200,<1`). If needed, pin/install a compatible "
+            "version in your environment."
         ) from exc
 
     # Log LangChain version for diagnostic purposes when the agent is built.
