@@ -1,7 +1,10 @@
+import json
 import time
+from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
+from pydantic import BaseModel, field_validator
 
 from src.tools.reddit_tool import RedditTool
 
@@ -41,6 +44,35 @@ class DummySubmission:
         self.over_18 = over_18
         self.spoiler = spoiler
         self.removed_by_category = removed_by_category
+
+
+FIXTURE_DIR = Path(__file__).parent / "fixtures" / "reddit"
+
+
+def _load_fixture_submissions():
+    """Return DummySubmission objects from the JSON fixtures."""
+
+    payload = json.loads((FIXTURE_DIR / "submissions.json").read_text())
+    submissions = []
+    for entry in payload:
+        submissions.append(
+            DummySubmission(
+                entry["id"],
+                entry["title"],
+                entry["selftext"],
+                entry["score"],
+                entry["num_comments"],
+                entry["url"],
+                entry["subreddit"],
+                entry["created_utc"],
+                author=entry["author"],
+                permalink=entry["permalink"],
+                over_18=entry["over_18"],
+                spoiler=entry["spoiler"],
+                removed_by_category=entry["removed_by_category"],
+            )
+        )
+    return submissions
 
 
 class DummySubreddit:
@@ -178,3 +210,123 @@ def test_subreddit_coercion_for_non_string_objects(monkeypatch, settings):
 
     assert len(results) == 1
     assert results[0]["subreddit"] == "r/fakesub"
+
+
+def test_reddit_tool_parses_fixture_payload(monkeypatch, settings):
+    """Fixture-backed regression to ensure sanitisation rules remain intact."""
+
+    items = _load_fixture_submissions()
+    client = DummyRedditClient({"test": DummySubreddit(items)})
+    monkeypatch.setattr("src.tools.reddit_tool.praw.Reddit", lambda **kw: client)
+
+    tool = RedditTool.from_settings(settings)
+    results = tool._run("fixture", subreddits=["test"], limit=5, per_subreddit=5)
+
+    assert len(results) == 2
+
+    first = results[0]
+    assert first["title"] == "Fixture title with link"
+    assert first["text"] == "Fixture body with @example mention"
+    assert first["permalink"] == "/r/test/comments/abc123/fixture/"
+    assert first["content_flags"] == ["spoiler"]
+
+    second = results[1]
+    assert "nsfw" in second["content_flags"] and "removed" in second["content_flags"]
+    assert second["author"] == "unknown-author"
+
+
+def test_merge_and_sort_skips_blank_ids(settings):
+    tool = RedditTool.from_settings(settings)
+    merged = tool._merge_and_sort(
+        [
+            [
+                {"id": "a1", "upvotes": 5, "comments": 1},
+                {"id": "", "upvotes": 2, "comments": 0},
+            ],
+            [
+                {"id": "a1", "upvotes": 10, "comments": 5},
+                {"id": "a2", "upvotes": 1, "comments": 0},
+            ],
+        ],
+        total_limit=10,
+    )
+
+    # Blank IDs are skipped and duplicates collapsed.
+    assert [row["id"] for row in merged] == ["a1", "a2"]
+
+
+def test_fetch_subreddit_retries_then_succeeds(monkeypatch, settings):
+    """Simulate a rate-limit scenario to exercise retry/backoff logic."""
+
+    tool = RedditTool.from_settings(settings)
+    attempt_counter = {"count": 0}
+
+    class FlakySubreddit:
+        def search(self, *args, **kwargs):
+            attempt_counter["count"] += 1
+            if attempt_counter["count"] == 1:
+                raise Exception("rate limited")
+            return [
+                DummySubmission(
+                    "retry",
+                    "Recovered",
+                    "",
+                    1,
+                    0,
+                    "http://example.com",
+                    "python",
+                    1_600_000_000,
+                )
+            ]
+
+    class FakeClient:
+        def subreddit(self, name):
+            return FlakySubreddit()
+
+    monkeypatch.setattr(tool, "_client", FakeClient())
+
+    # Avoid real sleeps during the test and capture the delay used.
+    sleeps = []
+    monkeypatch.setattr("src.tools.reddit_tool.time.sleep", lambda seconds: sleeps.append(seconds))
+
+    results = tool._fetch_subreddit("python", "query", limit=5, time_filter=None, retries=2)
+
+    assert attempt_counter["count"] == 2
+    assert sleeps == [0.5]
+    assert len(results) == 1
+    assert results[0]["title"] == "Recovered"
+
+
+class RedditDocumentModel(BaseModel):
+    """Simple schema to validate the normalised reddit payload."""
+
+    id: str
+    title: str
+    text: str
+    author: str
+    subreddit: str
+    permalink: str
+    url: str
+    created_at: str
+    upvotes: int
+    comments: int
+    content_flags: list[str]
+
+    @field_validator("created_at")
+    @classmethod
+    def ensure_isoformat(cls, value: str) -> str:
+        assert value.endswith("+00:00")
+        return value
+
+
+def test_normalized_payload_matches_schema(settings, monkeypatch):
+    """Validate the RedditTool output matches the parser's schema contract."""
+
+    items = _load_fixture_submissions()
+    client = DummyRedditClient({"test": DummySubreddit(items)})
+    monkeypatch.setattr("src.tools.reddit_tool.praw.Reddit", lambda **kw: client)
+
+    tool = RedditTool.from_settings(settings)
+    result = tool._run("fixture", subreddits=["test"], limit=2, per_subreddit=2)[0]
+
+    RedditDocumentModel(**result)

@@ -46,14 +46,19 @@ def test_reddit_tool_run_returns_results():
                         return [
                             SimpleNamespace(
                                 id="t1",
-                                title="Test Post",
-                                selftext="body",
+                                title="**Test** Post",
+                                selftext="body with [link](https://example.com)",
                                 score=5,
                                 num_comments=1,
-                                url="https://example.com",
+                                url=" https://example.com ",
                                 subreddit_name_prefixed=f"r/{name}",
                                 created_utc=1600000000.0,
                                 subreddit=f"r/{name}",
+                                author=None,
+                                permalink="/r/test/comments/t1",
+                                over_18=True,
+                                spoiler=False,
+                                removed_by_category=None,
                             )
                         ]
 
@@ -68,4 +73,10 @@ def test_reddit_tool_run_returns_results():
         tool = RedditTool.from_settings(settings)
     results = tool.run("test")
     assert isinstance(results, list)
-    assert len(results) >= 0
+    assert len(results) == 1
+    payload = results[0]
+    assert payload["title"] == "Test Post"
+    assert payload["text"] == "body with link"
+    assert payload["url"] == "https://example.com"
+    assert payload["created_at"].endswith("+00:00")
+    assert "nsfw" in payload["content_flags"]
