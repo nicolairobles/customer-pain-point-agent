@@ -6,7 +6,7 @@ normalized list of post dictionaries suitable for downstream extraction.
 Acceptance highlights implemented:
 - Search multiple subreddits in parallel using ThreadPoolExecutor.
 - Return configurable number of posts (default target between 10-20).
-- Each post includes: title, text, upvotes, comments, url, subreddit, timestamp.
+- Each post includes: id, title, text, author, subreddit, permalink, url, created_at, upvotes, comments, content_flags.
 - Graceful error handling with logging and empty-list fallback.
 """
 

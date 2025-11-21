@@ -12,7 +12,7 @@ from __future__ import annotations
 import html
 import re
 from datetime import datetime, timezone
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any, Dict, List, Optional
 
 import logging
 
