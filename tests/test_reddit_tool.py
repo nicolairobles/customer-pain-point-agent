@@ -1,7 +1,9 @@
+import json
 import time
 from unittest.mock import MagicMock
 
 import pytest
+from pydantic import BaseModel, ConfigDict
 
 from src.tools.reddit_tool import RedditTool
 
@@ -121,3 +123,34 @@ def test_subreddit_coercion_for_non_string_objects(monkeypatch, settings):
 
     assert len(results) == 1
     assert results[0]["subreddit"] == "r/fakesub"
+
+
+def test_normalized_schema_matches_pydantic_model(monkeypatch, settings):
+    class RedditPost(BaseModel):
+        model_config = ConfigDict(extra="forbid")
+
+        id: str
+        title: str
+        body: str
+        url: str
+        author: str
+        subreddit: str
+        timestamp: float
+        score: int
+        comments: int
+
+    items = [
+        DummySubmission("c1", "SchemaTest", "body", 7, 3, "http://example.com/1", "python", 1600000200, author="charlie"),
+    ]
+
+    client = DummyRedditClient({"python": DummySubreddit(items)})
+    monkeypatch.setattr("src.tools.reddit_tool.praw.Reddit", lambda **kw: client)
+
+    tool = RedditTool.from_settings(settings)
+    results = tool._run("q", subreddits=["python"], limit=5, per_subreddit=5)
+
+    assert results, "Expected at least one normalized result"
+    validated = RedditPost(**results[0])
+    serialized = json.dumps(validated.model_dump())
+
+    assert json.loads(serialized) == validated.model_dump()
