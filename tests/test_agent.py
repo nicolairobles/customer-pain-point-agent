@@ -168,3 +168,19 @@ def test_run_agent_smoke(monkeypatch: pytest.MonkeyPatch) -> None:
     assert result["pain_points"]
     assert "metadata" in result
     assert result["metadata"]["total_sources_searched"] == 3
+
+
+def test_agent_error_handling(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Simulate tool failure and ensure agent surfaces a friendly error."""
+
+    class FailingExecutor:
+        def invoke(self, payload: dict[str, Any]) -> dict[str, Any]:
+            raise RuntimeError("tool boom")
+
+    monkeypatch.setattr(pain_point_agent, "create_agent", lambda: FailingExecutor())
+
+    try:
+        pain_point_agent.run_agent("failure-query")
+        assert False, "Expected runtime error to propagate"
+    except RuntimeError as exc:
+        assert "tool boom" in str(exc)
