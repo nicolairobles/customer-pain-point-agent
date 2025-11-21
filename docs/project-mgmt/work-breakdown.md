@@ -109,7 +109,7 @@ Story points: 3
 Owner: Stefan
 Story Link:
 ```
-[Detailed Story](https://github.com/nicolairobles/customer-pain-point-agent/blob/master/docs/stories/1.2.1-design-reddit-api-wrapper-interface.md)
+[Detailed Story](https://github.com/nicolairobles/customer-pain-point-agent/blob/master/docs/stories/1.2.1-design-reddit-api-wrapper-interface.md) / docs/stories/1.2.1-design-reddit-api-wrapper-interface.md
 
 ```
 Activity ID: 1.2.2
