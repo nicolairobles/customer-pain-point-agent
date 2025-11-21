@@ -6,7 +6,7 @@ normalized list of post dictionaries suitable for downstream extraction.
 Acceptance highlights implemented:
 - Search multiple subreddits in parallel using ThreadPoolExecutor.
 - Return configurable number of posts (default target between 10-20).
-- Each post includes: id, title, text, author, subreddit, permalink, url, created_at, upvotes, comments, content_flags.
+- Each post includes: title, body, url, author, subreddit, timestamp, score, comments.
 - Graceful error handling with logging and empty-list fallback.
 """
 
@@ -64,6 +64,75 @@ class RedditTool(BaseTool):
         """Factory method to create a tool instance from global settings."""
 
         return cls(settings)
+
+    def _normalize_submission(self, submission: Any) -> Dict[str, Any]:
+        """Extract required fields from a PRAW Submission-like object."""
+        # Normalize subreddit to a string using helper.
+        subreddit_str = self._extract_subreddit(submission)
+        author_str = self._extract_author(submission)
+        score = int(getattr(submission, "score", 0) or 0)
+        body = getattr(submission, "selftext", "")
+
+        return {
+            "id": getattr(submission, "id", ""),
+            "title": getattr(submission, "title", ""),
+            "body": body,
+            "author": author_str,
+            "score": score,
+            "comments": int(getattr(submission, "num_comments", 0) or 0),
+            "url": getattr(submission, "url", ""),
+            "subreddit": subreddit_str,
+            "timestamp": float(getattr(submission, "created_utc", 0) or 0),
+        }
+
+    def _extract_subreddit(self, submission: Any) -> str:
+        """Return a normalized subreddit string for a submission.
+
+        Handles cases where `submission.subreddit` may be a string, a PRAW
+        Subreddit-like object, or missing. Preference order:
+        1. If `subreddit` is a string, return it.
+        2. If `subreddit_name_prefixed` is present, return it.
+        3. Otherwise, attempt `str(subreddit)` and fall back to empty string.
+        """
+        sub_attr = getattr(submission, "subreddit", None)
+
+        if isinstance(sub_attr, str):
+            return sub_attr
+
+        # Try explicit prefixed name first (common on PRAW submissions)
+        pref = getattr(submission, "subreddit_name_prefixed", None)
+        if pref:
+            return pref
+
+        # Fall back to stringifying the object if present
+        if sub_attr is not None:
+            try:
+                return str(sub_attr)
+            except Exception:
+                _LOG.debug("Failed to stringify subreddit object: %r", sub_attr)
+
+        return ""
+
+    def _extract_author(self, submission: Any) -> str:
+        """Return a normalized author string if present on a submission."""
+
+        author_attr = getattr(submission, "author", None)
+        if isinstance(author_attr, str):
+            return author_attr
+
+        if author_attr is None:
+            return ""
+
+        # PRAW author objects implement `.name`; fall back to str() if missing.
+        name_attr = getattr(author_attr, "name", None)
+        if name_attr:
+            return str(name_attr)
+
+        try:
+            return str(author_attr)
+        except Exception:
+            _LOG.debug("Failed to stringify author object: %r", author_attr)
+            return ""
 
     def _fetch_subreddit(self, subreddit_name: str, query: str, limit: int, time_filter: Optional[str], retries: int = 2) -> List[Dict[str, Any]]:
         """Fetch search results for a single subreddit with simple retry/backoff."""

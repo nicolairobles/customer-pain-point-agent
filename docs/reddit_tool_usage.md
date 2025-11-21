@@ -4,7 +4,7 @@ This document describes the `RedditTool` implemented in `src/tools/reddit_tool.p
 
 Summary
 - Searches multiple subreddits concurrently using PRAW and returns normalized post dictionaries.
-- Each post dict contains: `id`, `title`, `text`, `upvotes`, `comments`, `url`, `subreddit`, `timestamp`.
+- Each post dict contains: `id`, `title`, `body`, `score`, `comments`, `url`, `author`, `subreddit`, `timestamp`.
 
 Basic usage
 
