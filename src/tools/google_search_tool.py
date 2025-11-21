@@ -12,12 +12,15 @@ from config.settings import Settings
 class GoogleSearchTool(BaseTool):
     """Fetches relevant Google Search results based on a user query."""
 
-    name = "google_search"
-    description = "Search Google for discussions related to customer pain points."
+    name: str = "google_search"
+    description: str = "Search Google for discussions related to customer pain points."
+
+    settings: Any = None
 
     def __init__(self, settings: Settings) -> None:
-        super().__init__()
-        self.settings = settings
+        # Initialize pydantic/model fields via super().__init__ so assignment
+        # respects BaseTool's model semantics.
+        super().__init__(settings=settings)
         # Initialize Google Search client here when implementing
 
     @classmethod

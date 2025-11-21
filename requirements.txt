@@ -1,4 +1,4 @@
-langchain
+langchain>=0.0.200,<1
 openai
 streamlit
 praw

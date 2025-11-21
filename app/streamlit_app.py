@@ -4,6 +4,14 @@ from __future__ import annotations
 
 import streamlit as st
 
+# Ensure repo root is on sys.path so `from src...` imports work when
+# running via `streamlit run` (Streamlit changes the CWD/import path).
+import sys
+import pathlib
+REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 from src.agent.pain_point_agent import run_agent
 from src.utils.validators import ValidationError, validate_query_length
 from app.components.query_input import render_query_input

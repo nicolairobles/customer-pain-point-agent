@@ -1,0 +1,32 @@
+[
+  {
+    "id": "abc123",
+    "title": "How to use Python decorators for logging?",
+    "text": "I'm trying to create a decorator that logs function calls and duration. What are best practices?",
+    "upvotes": 124,
+    "comments": 12,
+    "url": "https://reddit.com/r/python/comments/abc123/how_to_use_python_decorators_for_logging",
+    "subreddit": "python",
+    "timestamp": 1627890000
+  },
+  {
+    "id": "def456",
+    "title": "Best patterns for composing decorators",
+    "text": "I've been chaining decorators and want to keep metadata. Any tips on using functools.wraps?",
+    "upvotes": 86,
+    "comments": 8,
+    "url": "https://reddit.com/r/learnprogramming/comments/def456/best_patterns_for_composing_decorators",
+    "subreddit": "learnprogramming",
+    "timestamp": 1627886400
+  },
+  {
+    "id": "ghi789",
+    "title": "Decorator to handle retries and exponential backoff",
+    "text": "Sharing a simple retry decorator I wrote that helps with flaky network calls.",
+    "upvotes": 212,
+    "comments": 34,
+    "url": "https://reddit.com/r/programming/comments/ghi789/decorator_to_handle_retries_and_exponential_backoff",
+    "subreddit": "programming",
+    "timestamp": 1627882800
+  }
+]

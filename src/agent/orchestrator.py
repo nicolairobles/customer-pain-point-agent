@@ -2,19 +2,56 @@
 
 from __future__ import annotations
 
-from typing import Iterable, List
-
-from langchain.agents import AgentExecutor, initialize_agent
-from langchain.tools import BaseTool
+from typing import Any, Iterable, List
 
 from config.settings import Settings
-from src.tools.google_search_tool import GoogleSearchTool
-from src.tools.reddit_tool import RedditTool
-from src.tools.twitter_tool import TwitterTool
 
 
-def build_agent_executor(settings: Settings) -> AgentExecutor:
-    """Construct an AgentExecutor configured with project tools and prompts."""
+def build_agent_executor(settings: Settings) -> Any:
+    """Construct an AgentExecutor configured with project tools and prompts.
+
+    LangChain imports are deferred until this function is called so that the
+    module can be imported in environments with incompatible LangChain
+    versions (tests, static analysis, etc.). If LangChain is missing or the
+    public API changed, an informative ImportError is raised.
+    """
+
+    try:
+        import langchain as _langchain
+        from langchain.agents import AgentExecutor, initialize_agent  # type: ignore
+        from langchain.tools import BaseTool  # type: ignore
+    except Exception as exc:  # pragma: no cover - environment specific
+        # Be explicit about likely causes: missing package, incompatible
+        # version, or changes to the public API. `requirements.txt` already
+        # contains a broad constraint (`langchain>=0.0.200,<1`), so if you've
+        # installed from a newer or older source, check the installed
+        # `langchain.__version__` and confirm it matches the project's
+        # compatibility. Pin a known-working version if necessary.
+        raise ImportError(
+            "Failed to import required classes from langchain. This can happen if "
+            "the package is not installed, or the installed `langchain` version is "
+            "incompatible with this code. Check `pip show langchain` (or inspect "
+            "`langchain.__version__`) and ensure it satisfies the project's constraint "
+            "(e.g. `langchain>=0.0.200,<1`). If needed, pin/install a compatible "
+            "version in your environment."
+        ) from exc
+
+    # Log LangChain version for diagnostic purposes when the agent is built.
+    try:
+        _lc_ver = getattr(_langchain, "__version__", None)
+        if _lc_ver is None:
+            # Fallback to importlib.metadata if available
+            try:
+                from importlib import metadata as _metadata
+
+                _lc_ver = _metadata.version("langchain")
+            except Exception:
+                _lc_ver = "unknown"
+        import logging
+
+        logging.getLogger(__name__).info("Using langchain version=%s", _lc_ver)
+    except Exception:
+        pass
 
     tools = _load_tools(settings)
     agent = initialize_agent(
@@ -27,14 +64,22 @@ def build_agent_executor(settings: Settings) -> AgentExecutor:
     return AgentExecutor(agent=agent.agent, tools=tools, verbose=True)
 
 
-def _load_tools(settings: Settings) -> List[BaseTool]:
+def _load_tools(settings: Settings) -> List[Any]:
     """Instantiate tool set with shared configuration."""
 
     return list(_iter_tools(settings))
 
 
-def _iter_tools(settings: Settings) -> Iterable[BaseTool]:
-    """Yield configured LangChain tools for the agent."""
+def _iter_tools(settings: Settings) -> Iterable[Any]:
+    """Yield configured LangChain tools for the agent.
+
+    Import tool implementations here to avoid triggering their module-level
+    side-effects (pydantic model construction) during test collection.
+    """
+
+    from src.tools.reddit_tool import RedditTool
+    from src.tools.twitter_tool import TwitterTool
+    from src.tools.google_search_tool import GoogleSearchTool
 
     yield RedditTool.from_settings(settings)
     yield TwitterTool.from_settings(settings)
