@@ -7,7 +7,7 @@ from src.tools.reddit_tool import RedditTool
 
 
 class DummySubmission:
-    def __init__(self, id, title, selftext, score, num_comments, url, subreddit, created_utc):
+    def __init__(self, id, title, selftext, score, num_comments, url, subreddit, created_utc, author="alice"):
         self.id = id
         self.title = title
         self.selftext = selftext
@@ -16,6 +16,7 @@ class DummySubmission:
         self.url = url
         self.subreddit = subreddit
         self.created_utc = created_utc
+        self.author = author
 
 
 class DummySubreddit:
@@ -65,8 +66,10 @@ def test_reddit_tool_returns_normalized_results(monkeypatch, settings):
     assert isinstance(results, list)
     assert len(results) == 2
     assert results[0]["title"] == "T1"
-    assert results[0]["upvotes"] == 10
+    assert results[0]["body"] == "body1"
+    assert results[0]["score"] == 10
     assert results[0]["comments"] == 2
+    assert results[0]["author"] == "alice"
 
 
 def test_reddit_tool_handles_empty_and_errors(monkeypatch, settings):
@@ -107,7 +110,7 @@ def test_subreddit_coercion_for_non_string_objects(monkeypatch, settings):
             return "r/fakesub"
 
     items = [
-        DummySubmission("b1", "Title", "b", 1, 0, "u", FakeSubObj(), 1600000000),
+        DummySubmission("b1", "Title", "b", 1, 0, "u", FakeSubObj(), 1600000000, author="bob"),
     ]
 
     client = DummyRedditClient({"python": DummySubreddit(items), "learnprogramming": DummySubreddit([]), "programming": DummySubreddit([])})

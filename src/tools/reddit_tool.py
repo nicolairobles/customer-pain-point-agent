@@ -6,7 +6,7 @@ normalized list of post dictionaries suitable for downstream extraction.
 Acceptance highlights implemented:
 - Search multiple subreddits in parallel using ThreadPoolExecutor.
 - Return configurable number of posts (default target between 10-20).
-- Each post includes: title, text, upvotes, comments, url, subreddit, timestamp.
+- Each post includes: title, body, url, author, subreddit, timestamp, score, comments.
 - Graceful error handling with logging and empty-list fallback.
 """
 
@@ -68,12 +68,16 @@ class RedditTool(BaseTool):
         """Extract required fields from a PRAW Submission-like object."""
         # Normalize subreddit to a string using helper.
         subreddit_str = self._extract_subreddit(submission)
+        author_str = self._extract_author(submission)
+        score = int(getattr(submission, "score", 0) or 0)
+        body = getattr(submission, "selftext", "")
 
         return {
             "id": getattr(submission, "id", ""),
             "title": getattr(submission, "title", ""),
-            "text": getattr(submission, "selftext", ""),
-            "upvotes": int(getattr(submission, "score", 0) or 0),
+            "body": body,
+            "author": author_str,
+            "score": score,
             "comments": int(getattr(submission, "num_comments", 0) or 0),
             "url": getattr(submission, "url", ""),
             "subreddit": subreddit_str,
@@ -107,6 +111,27 @@ class RedditTool(BaseTool):
                 _LOG.debug("Failed to stringify subreddit object: %r", sub_attr)
 
         return ""
+
+    def _extract_author(self, submission: Any) -> str:
+        """Return a normalized author string if present on a submission."""
+
+        author_attr = getattr(submission, "author", None)
+        if isinstance(author_attr, str):
+            return author_attr
+
+        if author_attr is None:
+            return ""
+
+        # PRAW author objects implement `.name`; fall back to str() if missing.
+        name_attr = getattr(author_attr, "name", None)
+        if name_attr:
+            return str(name_attr)
+
+        try:
+            return str(author_attr)
+        except Exception:
+            _LOG.debug("Failed to stringify author object: %r", author_attr)
+            return ""
 
     def _fetch_subreddit(self, subreddit_name: str, query: str, limit: int, time_filter: Optional[str], retries: int = 2) -> List[Dict[str, Any]]:
         """Fetch search results for a single subreddit with simple retry/backoff."""
