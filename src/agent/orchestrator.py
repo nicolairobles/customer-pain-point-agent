@@ -56,14 +56,16 @@ def build_agent_executor(settings: Settings) -> Any:
         pass
 
     tools = _load_tools(settings)
+    llm = _build_llm(settings)
     agent = initialize_agent(
         tools=tools,
-        llm=None,  # To be replaced with actual LLM initialization
+        llm=llm,
         agent="zero-shot-react-description",
-        verbose=True,
-        max_iterations=5,
+        verbose=settings.agent.verbose,
+        max_iterations=max(1, settings.agent.max_iterations),
+        handle_parsing_errors=True,
     )
-    return AgentExecutor(agent=agent.agent, tools=tools, verbose=True)
+    return agent
 
 
 def _load_tools(settings: Settings) -> List[Any]:
@@ -86,3 +88,44 @@ def _iter_tools(settings: Settings) -> Iterable[Any]:
     yield RedditTool.from_settings(settings)
     yield TwitterTool.from_settings(settings)
     yield GoogleSearchTool.from_settings(settings)
+
+
+def _build_llm(settings: Settings) -> Any:
+    """Instantiate a chat LLM from settings, tolerant of LangChain API variants."""
+
+    try:
+        # Newer LangChain versions split providers; try the bundled one first.
+        try:
+            from langchain.chat_models import ChatOpenAI  # type: ignore
+        except Exception:
+            from langchain_openai import ChatOpenAI  # type: ignore
+    except Exception as exc:  # pragma: no cover - environment specific
+        raise ImportError(
+            "ChatOpenAI is not available. Install the appropriate provider "
+            "(e.g., `langchain` with OpenAI extras or `langchain-openai`)."
+        ) from exc
+
+    base_kwargs = {
+        "temperature": settings.llm.temperature,
+        "openai_api_key": settings.api.openai_api_key or None,
+    }
+
+    variants = [
+        {"model": settings.llm.model, "max_tokens": settings.llm.max_output_tokens, "timeout": settings.llm.request_timeout_seconds},
+        {"model_name": settings.llm.model, "max_tokens": settings.llm.max_output_tokens, "request_timeout": settings.llm.request_timeout_seconds},
+        {"model": settings.llm.model},
+        {"model_name": settings.llm.model},
+    ]
+
+    last_error: Exception | None = None
+    for variant in variants:
+        try:
+            return ChatOpenAI(**{**base_kwargs, **variant})
+        except TypeError as exc:
+            last_error = exc
+            continue
+
+    raise TypeError(
+        "Unable to construct ChatOpenAI with provided settings; please verify "
+        "the installed LangChain/OpenAI provider version."
+    ) from last_error
