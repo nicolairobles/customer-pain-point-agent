@@ -1,0 +1,148 @@
+Project Overview (Simple Explanation)
+
+This project is a Twitter data fetching and cleaning system. It allows you to:
+
+Search for recent tweets using keywords.
+
+Normalize and clean raw tweet data into a structured format.
+
+Safely test the system without using real Twitter credentials.
+
+Ensure reliability with unit tests covering edge cases like rate limits, empty responses, malformed payloads, and authentication failures.
+
+Think of it as a “Twitter scraper + data cleaner + safe test suite”.
+
+
+
+File-by-File Explanation
+1. twitter_tool.py
+
+Purpose: Communicates directly with the Twitter API.
+
+Responsibilities:
+
+Sends HTTP requests to search for tweets.
+
+Handles rate limits and HTTP errors.
+
+Returns raw tweet data as Python dictionaries.
+
+Analogy: Like a person who goes to Twitter, grabs the tweets, and hands you the raw data.
+
+2. twitter_wrapper.py
+
+Purpose: Wraps around twitter_tool.py and normalizes tweets.
+
+Responsibilities:
+
+Converts raw tweets into NormalizedTweet objects.
+
+Deduplicates retweets.
+
+Sanitizes content (removes URLs, PII, markdown-unsafe characters).
+
+Injects metadata like platform="twitter".
+
+Converts timestamps to ISO 8601 UTC.
+
+Gracefully skips incomplete or malformed tweets.
+
+Analogy: Like a filter that cleans messy data and turns it into neat, structured objects.
+
+3. tests/twitter/test_integration.py
+
+Purpose: Demonstrates real API usage.
+
+Responsibilities:
+
+Runs search queries via TwitterWrapper.
+
+Prints normalized tweets.
+
+Note: Requires a valid Twitter Bearer token.
+
+Analogy: A demo showing how the system works in real life.
+
+4. tests/twitter/test_twitter_tool_unit.py
+
+Purpose: Unit tests for twitter_tool.py.
+
+Responsibilities:
+
+Test success responses, zero results, rate-limit handling.
+
+Test authentication failures.
+
+Test malformed payloads.
+
+Fully mocks API calls (no real Twitter needed).
+
+Analogy: A safe practice run to make sure the Twitter API helper behaves correctly in all scenarios.
+
+5. tests/twitter/test_twitter_wrapper.py
+
+Purpose: Unit tests for twitter_wrapper.py.
+
+Responsibilities:
+
+Test normalization of tweets into NormalizedTweet.
+
+Test handling of empty results.
+
+Verify timestamps, raw field, and author mapping.
+
+Fully mocks API calls (no real Twitter needed).
+
+Analogy: Ensures the wrapper cleans and parses tweets exactly as expected.
+
+
+
+
+How Everything Works Together
++------------------+       +-----------------+       +--------------------+
+| Twitter API      | ----> | twitter_tool.py | ----> | twitter_wrapper.py |
+| (raw tweets)     |       | (fetch & retry) |       | (normalize/parse) |
++------------------+       +-----------------+       +--------------------+
+                                                        |
+                                                        v
+                                                 +----------------+
+                                                 | NormalizedTweet|
+                                                 +----------------+
+
+
+test_twitter_tool_unit.py ensures API helper functions behave correctly.
+
+test_twitter_wrapper.py ensures parsing and normalization works properly.
+
+test_integration.py demonstrates end-to-end functionality with real Twitter data.
+
+
+The project fetches tweets from Twitter, cleans and normalizes them, and provides safe, tested code for reliable downstream analysis.
+
+
+                           +-------------------+
+                           |   Twitter API     |
+                           |  (raw tweets)     |
+                           +--------+----------+
+                                    |
+                                    v
+                         +------------------------+
+                         |    twitter_tool.py     |
+                         |  (fetch & retry logic)|
+                         +--------+---------------+
+                                  |   ^
+                                  |   | Unit tests:
+                                  |   | test_twitter_tool_unit.py
+                                  v
+                         +------------------------+
+                         |   twitter_wrapper.py   |
+                         | (data parsing & clean)|
+                         +--------+---------------+
+                                  |   ^
+                                  |   | Unit tests:
+                                  |   | test_twitter_wrapper.py
+                                  v
+                         +------------------------+
+                         |   NormalizedTweet      |
+                         | (clean, structured)   |
+                         +------------------------+
