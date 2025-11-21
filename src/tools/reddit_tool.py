@@ -22,6 +22,7 @@ import praw
 from langchain.tools import BaseTool
 
 from config.settings import Settings
+from src.tools.reddit_parser import normalize_submission
 
 _LOG = logging.getLogger(__name__)
 
@@ -64,50 +65,6 @@ class RedditTool(BaseTool):
 
         return cls(settings)
 
-    def _normalize_submission(self, submission: Any) -> Dict[str, Any]:
-        """Extract required fields from a PRAW Submission-like object."""
-        # Normalize subreddit to a string using helper.
-        subreddit_str = self._extract_subreddit(submission)
-
-        return {
-            "id": getattr(submission, "id", ""),
-            "title": getattr(submission, "title", ""),
-            "text": getattr(submission, "selftext", ""),
-            "upvotes": int(getattr(submission, "score", 0) or 0),
-            "comments": int(getattr(submission, "num_comments", 0) or 0),
-            "url": getattr(submission, "url", ""),
-            "subreddit": subreddit_str,
-            "timestamp": float(getattr(submission, "created_utc", 0) or 0),
-        }
-
-    def _extract_subreddit(self, submission: Any) -> str:
-        """Return a normalized subreddit string for a submission.
-
-        Handles cases where `submission.subreddit` may be a string, a PRAW
-        Subreddit-like object, or missing. Preference order:
-        1. If `subreddit` is a string, return it.
-        2. If `subreddit_name_prefixed` is present, return it.
-        3. Otherwise, attempt `str(subreddit)` and fall back to empty string.
-        """
-        sub_attr = getattr(submission, "subreddit", None)
-
-        if isinstance(sub_attr, str):
-            return sub_attr
-
-        # Try explicit prefixed name first (common on PRAW submissions)
-        pref = getattr(submission, "subreddit_name_prefixed", None)
-        if pref:
-            return pref
-
-        # Fall back to stringifying the object if present
-        if sub_attr is not None:
-            try:
-                return str(sub_attr)
-            except Exception:
-                _LOG.debug("Failed to stringify subreddit object: %r", sub_attr)
-
-        return ""
-
     def _fetch_subreddit(self, subreddit_name: str, query: str, limit: int, time_filter: Optional[str], retries: int = 2) -> List[Dict[str, Any]]:
         """Fetch search results for a single subreddit with simple retry/backoff."""
 
@@ -120,7 +77,9 @@ class RedditTool(BaseTool):
                 t0 = time.time()
                 submissions = subreddit.search(query, limit=limit, sort="relevance", time_filter=time_filter)
                 t1 = time.time()
-                results = [self._normalize_submission(s) for s in submissions]
+                # Hand off PRAW objects to the parsing helper which fulfils the
+                # sanitisation acceptance criteria for story 1.2.3.
+                results = [normalize_submission(s) for s in submissions]
                 _LOG.debug(
                     "Fetched %d items from r/%s in %.2f seconds",
                     len(results), subreddit_name, t1 - t0,
