@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Iterable, List
+from typing import Any, Dict, Iterable, List
 
 from config.settings import Settings
 
@@ -91,41 +91,48 @@ def _iter_tools(settings: Settings) -> Iterable[Any]:
 
 
 def _build_llm(settings: Settings) -> Any:
-    """Instantiate a chat LLM from settings, tolerant of LangChain API variants."""
+    """Instantiate an LLM backed by the OpenAIService wrapper (settings-driven)."""
 
     try:
-        # Newer LangChain versions split providers; try the bundled one first.
-        try:
-            from langchain.chat_models import ChatOpenAI  # type: ignore
-        except Exception:
-            from langchain_openai import ChatOpenAI  # type: ignore
+        from langchain.llms.base import LLM  # type: ignore
     except Exception as exc:  # pragma: no cover - environment specific
         raise ImportError(
-            "ChatOpenAI is not available. Install the appropriate provider "
-            "(e.g., `langchain` with OpenAI extras or `langchain-openai`)."
+            "LangChain LLM base class not available. Confirm `langchain` satisfies project constraints."
         ) from exc
 
-    base_kwargs = {
-        "temperature": settings.llm.temperature,
-        "openai_api_key": settings.api.openai_api_key or None,
-    }
+    from src.services import OpenAIService
 
-    variants = [
-        {"model": settings.llm.model, "max_tokens": settings.llm.max_output_tokens, "timeout": settings.llm.request_timeout_seconds},
-        {"model_name": settings.llm.model, "max_tokens": settings.llm.max_output_tokens, "request_timeout": settings.llm.request_timeout_seconds},
-        {"model": settings.llm.model},
-        {"model_name": settings.llm.model},
-    ]
+    class OpenAIServiceLLM(LLM):
+        """Adapter to make OpenAIService compatible with LangChain agents."""
 
-    last_error: Exception | None = None
-    for variant in variants:
-        try:
-            return ChatOpenAI(**{**base_kwargs, **variant})
-        except TypeError as exc:
-            last_error = exc
-            continue
+        def __init__(self, service: OpenAIService):
+            super().__init__()
+            self._service = service
 
-    raise TypeError(
-        "Unable to construct ChatOpenAI with provided settings; please verify "
-        "the installed LangChain/OpenAI provider version."
-    ) from last_error
+        @property
+        def _llm_type(self) -> str:
+            return "openai-service"
+
+        @property
+        def _identifying_params(self) -> Dict[str, Any]:
+            llm_settings = service_settings
+            return {
+                "model": llm_settings.model,
+                "temperature": llm_settings.temperature,
+                "max_output_tokens": llm_settings.max_output_tokens,
+            }
+
+        def _call(self, prompt: str, stop: List[str] | None = None, run_manager: Any = None, **kwargs: Any) -> str:
+            # OpenAIService does not currently accept stop tokens; emulate simple stop behavior locally.
+            result = self._service.generate(prompt)
+            text = result.text
+            if stop:
+                for token in stop:
+                    if token in text:
+                        text = text.split(token)[0]
+                        break
+            return text
+
+    service_settings = settings.llm
+    service = OpenAIService.from_settings(settings)
+    return OpenAIServiceLLM(service)
