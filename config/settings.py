@@ -43,12 +43,25 @@ class BudgetSettings:
 
 
 @dataclass(frozen=True)
+class LLMSettings:
+    """Configuration for Large Language Model invocation."""
+
+    model: str = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+    temperature: float = float(os.getenv("OPENAI_TEMPERATURE", "0.0"))
+    max_output_tokens: int = int(os.getenv("OPENAI_MAX_OUTPUT_TOKENS", "512"))
+    request_timeout_seconds: float = float(os.getenv("OPENAI_REQUEST_TIMEOUT_SECONDS", "30"))
+    max_retry_attempts: int = int(os.getenv("OPENAI_MAX_RETRY_ATTEMPTS", "3"))
+    retry_backoff_seconds: float = float(os.getenv("OPENAI_RETRY_BACKOFF_SECONDS", "1"))
+
+
+@dataclass(frozen=True)
 class Settings:
     """Aggregated application settings exposed to the rest of the codebase."""
 
     api: APISettings = APISettings()
     agent: AgentSettings = AgentSettings()
     budget: BudgetSettings = BudgetSettings()
+    llm: LLMSettings = LLMSettings()
 
 
 settings = Settings()
@@ -61,4 +74,5 @@ def to_dict() -> Dict[str, Any]:
         "api": settings.api.__dict__,
         "agent": settings.agent.__dict__,
         "budget": settings.budget.__dict__,
+        "llm": settings.llm.__dict__,
     }
