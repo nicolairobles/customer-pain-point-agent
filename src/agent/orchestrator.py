@@ -51,6 +51,8 @@ def build_agent_executor(settings: Settings) -> Any:
 
         logging.getLogger(__name__).info("Using langchain version=%s", _lc_ver)
     except Exception:
+        # Version logging is purely diagnostic; never block agent construction if
+        # telemetry lookups fail (e.g., metadata missing in constrained envs).
         pass
 
     tools = _load_tools(settings)
