@@ -142,3 +142,29 @@ def test_agent_stream_interface(monkeypatch: pytest.MonkeyPatch) -> None:
     events = list(executor.stream({"input": "stream-test"}))
     assert events[0]["event"] == "start"
     assert events[-1]["event"] == "end"
+
+
+def test_run_agent_smoke(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Smoke test: run_agent returns structured metadata without raising."""
+
+    class DummyExecutor:
+        def __init__(self) -> None:
+            self.invocations: list[dict[str, Any]] = []
+
+        def invoke(self, payload: dict[str, Any]) -> dict[str, Any]:
+            self.invocations.append(payload)
+            return {
+                "query": payload.get("input", ""),
+                "pain_points": [{"text": "sample"}],
+                "metadata": {"total_sources_searched": 3, "execution_time": 0.12, "api_costs": 0.0},
+            }
+
+    dummy_executor = DummyExecutor()
+    monkeypatch.setattr(pain_point_agent, "create_agent", lambda: dummy_executor)
+
+    result = pain_point_agent.run_agent("smoke-test query")
+
+    assert result["query"] == "smoke-test query"
+    assert result["pain_points"]
+    assert "metadata" in result
+    assert result["metadata"]["total_sources_searched"] == 3
