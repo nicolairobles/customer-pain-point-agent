@@ -29,7 +29,10 @@ def retry_request(url, headers, params, max_retries=3):
             })
             response.raise_for_status()
         return response.json()
-    raise Exception("Max retries exceeded")
+    raise Exception(
+    f"Max retries ({max_retries}) exceeded for {url}. "
+    f"Last status: {response.status_code if 'response' in locals() else 'No response'}"
+)
 
 def search_tweets(query, bearer_token, max_results=10):
     headers = {"Authorization": f"Bearer {bearer_token}"}
