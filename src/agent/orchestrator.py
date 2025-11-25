@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Iterable, List
+from typing import Any, Dict, Iterable, List
 
 from config.settings import Settings
 
@@ -56,14 +56,16 @@ def build_agent_executor(settings: Settings) -> Any:
         pass
 
     tools = _load_tools(settings)
+    llm = _build_llm(settings)
     agent = initialize_agent(
         tools=tools,
-        llm=None,  # To be replaced with actual LLM initialization
+        llm=llm,
         agent="zero-shot-react-description",
-        verbose=True,
-        max_iterations=5,
+        verbose=settings.agent.verbose,
+        max_iterations=max(1, settings.agent.max_iterations),
+        handle_parsing_errors=True,
     )
-    return AgentExecutor(agent=agent.agent, tools=tools, verbose=True)
+    return agent
 
 
 def _load_tools(settings: Settings) -> List[Any]:
@@ -86,3 +88,52 @@ def _iter_tools(settings: Settings) -> Iterable[Any]:
     yield RedditTool.from_settings(settings)
     yield TwitterTool.from_settings(settings)
     yield GoogleSearchTool.from_settings(settings)
+
+
+def _build_llm(settings: Settings) -> Any:
+    """Instantiate an LLM backed by the OpenAIService wrapper (settings-driven)."""
+
+    try:
+        from langchain.llms.base import LLM  # type: ignore
+    except Exception as exc:  # pragma: no cover - environment specific
+        raise ImportError(
+            "LangChain LLM base class not available. Confirm `langchain` satisfies project constraints."
+        ) from exc
+
+    from src.services import OpenAIService
+
+    class OpenAIServiceLLM(LLM):
+        """Adapter to make OpenAIService compatible with LangChain agents."""
+
+        def __init__(self, service: OpenAIService):
+            super().__init__()
+            self._service = service
+            self._settings = service_settings
+
+        @property
+        def _llm_type(self) -> str:
+            return "openai-service"
+
+        @property
+        def _identifying_params(self) -> Dict[str, Any]:
+            llm_settings = self._settings
+            return {
+                "model": llm_settings.model,
+                "temperature": llm_settings.temperature,
+                "max_output_tokens": llm_settings.max_output_tokens,
+            }
+
+        def _call(self, prompt: str, stop: List[str] | None = None, run_manager: Any = None, **kwargs: Any) -> str:
+            # OpenAIService does not currently accept stop tokens; emulate simple stop behavior locally.
+            result = self._service.generate(prompt)
+            text = result.text
+            if stop:
+                for token in stop:
+                    if token in text:
+                        text = text.split(token)[0]
+                        break
+            return text
+
+    service_settings = settings.llm
+    service = OpenAIService.from_settings(settings)
+    return OpenAIServiceLLM(service)
