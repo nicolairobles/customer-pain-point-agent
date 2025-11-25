@@ -108,6 +108,7 @@ def _build_llm(settings: Settings) -> Any:
         def __init__(self, service: OpenAIService):
             super().__init__()
             self._service = service
+            self._settings = service_settings
 
         @property
         def _llm_type(self) -> str:
@@ -115,7 +116,7 @@ def _build_llm(settings: Settings) -> Any:
 
         @property
         def _identifying_params(self) -> Dict[str, Any]:
-            llm_settings = service_settings
+            llm_settings = self._settings
             return {
                 "model": llm_settings.model,
                 "temperature": llm_settings.temperature,
