@@ -10,7 +10,6 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-
 @dataclass(frozen=True)
 class APISettings:
     """Holds API credential configuration for external services."""
