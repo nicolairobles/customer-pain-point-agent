@@ -31,6 +31,10 @@ DELIVERABLES
 ├── 4.2 Documentation
 ├── 4.3 Demo Video Creation
 └── 4.4 Team Knowledge Transfer
+
+5.0 PHASE 5: MAINTENANCE & OPERATIONS
+├── 5.1 Dependency Management & Maintenance
+└── 5.2 Continuous Improvement Backlog
 ```
 
 **ACTIVITY LIST (Week 1 - Detailed)**
@@ -560,4 +564,29 @@ Issue Link:
 [Generated Issue](https://github.com/nicolairobles/customer-pain-point-agent/blob/master/issues/generated/4.4.1_conduct-team-knowledge-transfer.md)
 
 ```
+
+PHASE 5: MAINTENANCE & OPERATIONS
+
+```
+Activity ID: 5.1.1
+Activity: Upgrade LangChain runtime to v1
+Description: Refactor agent orchestration to support LangChain 1.x runnable APIs
+Work Package: 5.1 Dependency Management & Maintenance
+Duration: 4 hours
+Owner: TBD
+Issue Link:
+```
+[Generated Issue](https://github.com/nicolairobles/customer-pain-point-agent/blob/master/issues/generated/5.1.1_upgrade-langchain-runtime-to-v1.md)
+
+```
+Activity ID: 5.1.2
+Activity: Implement dependency update automation
+Description: Evaluate Dependabot/Renovate and propose automated update cadence
+Work Package: 5.1 Dependency Management & Maintenance
+Duration: 2 hours
+Owner: TBD
+Issue Link:
+```
+[Generated Issue](https://github.com/nicolairobles/customer-pain-point-agent/blob/master/issues/generated/5.1.2_implement-dependency-update-automation.md)
+
 

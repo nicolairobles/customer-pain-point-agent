@@ -1,4 +1,5 @@
 import json
+from typing import Any, Dict
 from unittest.mock import MagicMock
 
 import pytest
@@ -70,6 +71,14 @@ def settings():
         api = API()
 
     return S()
+
+
+def _model_to_dict(model: BaseModel) -> Dict[str, Any]:
+    """Return a dictionary representation compatible with Pydantic v1/v2."""
+
+    if hasattr(model, "model_dump"):
+        return model.model_dump()  # type: ignore[attr-defined]
+    return model.dict()
 
 
 def test_reddit_tool_returns_normalized_results(monkeypatch, settings):
@@ -214,6 +223,7 @@ def test_normalized_schema_matches_pydantic_model(monkeypatch, settings):
 
     assert results, "Expected at least one normalized result"
     validated = RedditPost(**results[0])
-    serialized = json.dumps(validated.model_dump())
+    model_dict = _model_to_dict(validated)
+    serialized = json.dumps(model_dict)
 
-    assert json.loads(serialized) == validated.model_dump()
+    assert json.loads(serialized) == model_dict

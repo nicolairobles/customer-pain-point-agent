@@ -20,6 +20,7 @@ from typing import Any, Dict, Iterable, List, Optional
 
 import praw
 from langchain.tools import BaseTool
+from pydantic import PrivateAttr
 
 from config.settings import Settings
 from src.tools.reddit_parser import normalize_submission
@@ -39,6 +40,7 @@ class RedditTool(BaseTool):
     description: str = "Search Reddit for discussions related to customer pain points."
 
     settings: Any = None
+    _client: Any = PrivateAttr(default=None)
 
     def __init__(self, settings: Settings) -> None:
         # Initialize pydantic/model fields via super().__init__ so assignment
