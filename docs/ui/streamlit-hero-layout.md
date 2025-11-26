@@ -49,6 +49,12 @@
 - **Source Filters**: for Phase 2, plan sidebar using `st.sidebar` with checkboxes/toggles; document here for stakeholders.
 - **Error Messaging**: reserve `st.empty()` below input to render alerts (rate limits, validation).
 
+## Styling System (1.4.4)
+- Global tokens/overrides live in `app/theme.py`; `apply_global_styles()` injects CSS that aligns typography, background gradient, and button styling with the hero mock.
+- Components should rely on CSS variables (`--color-surface`, `--color-text-secondary`, etc.) rather than hard-coded hex values to stay consistent across light/dark modes.
+- Responsive tweaks are handled via `@media` blocks in the theme plus component-level styles (`results_display.py`); reuse the variables when extending tabs/metrics.
+- To preview styling without the full agent, run `streamlit run scripts/dev_results_preview.py` which renders the results card layout with sample data.
+
 ## Developer UX Exercise Checklist
 1. **Launch the app**
    - `source .venv/bin/activate`

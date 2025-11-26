@@ -17,6 +17,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from app.components.results_display import render_results
+from app.theme import apply_global_styles
 
 
 SAMPLE_RESULTS = {
@@ -60,6 +61,7 @@ SAMPLE_RESULTS = {
 
 def main() -> None:
     st.set_page_config(page_title="Results Preview", layout="wide")
+    apply_global_styles()
     st.title("Results Component Preview")
     st.write(
         "This preview renders the 1.4.3 results display with a fixed payload so you can inspect styling "
