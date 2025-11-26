@@ -49,6 +49,22 @@
 - **Source Filters**: for Phase 2, plan sidebar using `st.sidebar` with checkboxes/toggles; document here for stakeholders.
 - **Error Messaging**: reserve `st.empty()` below input to render alerts (rate limits, validation).
 
+## Developer UX Exercise Checklist
+1. **Launch the app**
+   - `source .venv/bin/activate`
+   - `streamlit run app/streamlit_app.py`
+   - App serves at `http://localhost:8501`.
+2. **Desktop verification**
+   - Test empty input, valid query (<= 50 words), and over-limit state.
+   - Confirm info/error/success feedback banners and word counter updates.
+   - Select each preset—text area should populate and preset selector should reset.
+3. **Responsive sweep**
+   - Use browser dev tools device mode (e.g., iPhone 14, iPad, 1280‑px desktop).
+   - Ensure input pill remains centered, caption legible, and preset dropdown accessible.
+   - Check that virtual keyboards do not hide banners on mobile widths.
+4. **Capture findings**
+   - Record deviations, screenshots, or follow-up tasks in the story issue before checking off UX review.
+
 ## Deliverables for Story 1.4.1
 - This document stored under `docs/ui`.
 - Story/issue checklists updated to mark wireframes/spec prepared, accessibility documented, feasibility confirmed with developers.
