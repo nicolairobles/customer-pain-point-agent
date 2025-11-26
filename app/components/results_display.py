@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import html
+import re
 from dataclasses import dataclass
 from typing import Any, Dict, Iterable, List, Sequence
+from urllib.parse import urlparse
 
 import streamlit as st
 
@@ -71,6 +74,8 @@ _RESULTS_STYLE = """
 </style>
 """
 
+_MARKDOWN_ESCAPE_RE = re.compile(r"([\\`*_{}\[\]()#+.!-])")
+
 
 @dataclass
 class MetadataStat:
@@ -111,6 +116,34 @@ def build_metadata_summary(metadata: Dict[str, Any]) -> List[MetadataStat]:
     ]
 
 
+def _escape_markdown(text: str) -> str:
+    """Escape characters with special meaning in Markdown."""
+
+    text = html.escape(text, quote=False)
+    return _MARKDOWN_ESCAPE_RE.sub(r"\\\1", text)
+
+
+def _sanitize_citation_label(label: str) -> str:
+    """Escape Markdown characters in citation labels."""
+
+    label = label.strip() or "Source"
+    return _escape_markdown(label)
+
+
+def _build_citation(label: str, url: str | None) -> str:
+    """Return a sanitized markdown citation string."""
+
+    safe_label = _sanitize_citation_label(label)
+    if not url:
+        return safe_label
+
+    parsed = urlparse(url.strip())
+    if parsed.scheme.lower() not in {"http", "https"} or not parsed.netloc:
+        return safe_label
+
+    return f"[{safe_label}]({url.strip()})"
+
+
 def normalize_pain_points(pain_points: Iterable[Dict[str, Any]]) -> List[PainPointDisplay]:
     """Coerce raw pain point payloads into display-friendly structures."""
 
@@ -132,12 +165,9 @@ def normalize_pain_points(pain_points: Iterable[Dict[str, Any]]) -> List[PainPoi
 
         citations: List[str] = []
         for source in raw.get("sources", []):
-            title_or_platform = source.get("title") or source.get("platform") or "Source"
+            title_or_platform = str(source.get("title") or source.get("platform") or "Source")
             url = source.get("url")
-            if url:
-                citations.append(f"[{title_or_platform}]({url})")
-            else:
-                citations.append(title_or_platform)
+            citations.append(_build_citation(title_or_platform, url if isinstance(url, str) else None))
 
         normalized.append(
             PainPointDisplay(
@@ -181,12 +211,12 @@ def render_results(results: Dict[str, Any]) -> None:
     if errors:
         st.error("We ran into issues while aggregating results:")
         for message in errors:
-            st.markdown(f"- {message}")
+            st.markdown(f"- {_escape_markdown(message)}")
 
     if warnings:
         st.warning("Partial results returned; some sources may be missing:")
         for message in warnings:
-            st.markdown(f"- {message}")
+            st.markdown(f"- {_escape_markdown(message)}")
 
     if not pain_points:
         st.info("No pain points identified yet. Try refining your query or adjusting filters.")
@@ -209,11 +239,13 @@ def render_results(results: Dict[str, Any]) -> None:
 
     for tab, pain_point in zip(tabs, pain_points):
         with tab:
+            summary_html = html.escape(pain_point.summary)
+            frequency_html = html.escape(pain_point.frequency_label)
             st.markdown(
                 f"""
                 <div class="pp-card">
-                    <p>{pain_point.summary}</p>
-                    <p class="pp-frequency">{pain_point.frequency_label}</p>
+                    <p>{summary_html}</p>
+                    <p class="pp-frequency">{frequency_html}</p>
                 </div>
                 """,
                 unsafe_allow_html=True,
@@ -222,10 +254,10 @@ def render_results(results: Dict[str, Any]) -> None:
             if pain_point.examples:
                 st.markdown("**Examples**")
                 for example in pain_point.examples:
-                    st.markdown(f"- {example}")
+                    st.markdown(f"- {_escape_markdown(example)}")
 
             if pain_point.citations:
                 st.markdown("**Source Citations**")
                 for citation in pain_point.citations:
-                    st.markdown(f"- {citation}", unsafe_allow_html=True)
+                    st.markdown(f"- {citation}")
 

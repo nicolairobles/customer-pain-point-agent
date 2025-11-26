@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from typing import Any, Dict, List, Optional
 
 
@@ -24,24 +25,33 @@ def truncate_description(description: str, max_length: int = 200) -> str:
     return f"{description[: max_length - 3]}..."
 
 
+def _coerce_finite_float(value: Optional[float]) -> Optional[float]:
+    """Attempt to coerce a value to a finite float, returning None otherwise."""
+
+    try:
+        coerced = float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return None
+
+    if math.isnan(coerced) or math.isinf(coerced):
+        return None
+
+    return coerced
+
+
 def format_duration(seconds: Optional[float]) -> str:
     """Convert a raw duration to a user-friendly string."""
 
-    if seconds is None:
+    coerced = _coerce_finite_float(seconds)
+    if coerced is None:
         return "0.00s"
-    try:
-        return f"{float(seconds):.2f}s"
-    except (TypeError, ValueError):
-        return "0.00s"
+    return f"{coerced:.2f}s"
 
 
 def format_currency(amount: Optional[float]) -> str:
     """Format API cost figures in USD with mill precision."""
 
-    if amount is None:
+    coerced = _coerce_finite_float(amount)
+    if coerced is None:
         return "$0.000"
-    try:
-        value = float(amount)
-    except (TypeError, ValueError):
-        return "$0.000"
-    return f"${value:,.3f}"
+    return f"${coerced:,.3f}"
