@@ -21,17 +21,15 @@ class GoogleSearchTool(BaseTool):
     description: str = "Search Google for discussions related to customer pain points."
 
     settings: Any = None
-    _api_key: str | None = None
-    _cse_id: str | None = None
 
     def __init__(self, settings: Settings) -> None:
         # Initialize BaseTool fields
         super().__init__(settings=settings)
         self.settings = settings
-        self._api_key = settings.api.google_search_api_key or None
-        self._cse_id = settings.api.google_search_engine_id or None
+        api_key = settings.api.google_search_api_key
+        cse_id = settings.api.google_search_engine_id
 
-        if not self._api_key or not self._cse_id:
+        if not api_key or not cse_id:
             raise RuntimeError("GoogleSearchTool requires GOOGLE_SEARCH_API_KEY and GOOGLE_SEARCH_ENGINE_ID to be set in settings.api")
 
     @classmethod
@@ -61,8 +59,8 @@ class GoogleSearchTool(BaseTool):
         except Exception as e:  # pragma: no cover - dependency/runtime guard
             raise RuntimeError("google-api-python-client is required to use GoogleSearchTool") from e
 
-        service = build("customsearch", "v1", developerKey=self._api_key)
-        params = {"q": query, "cx": self._cse_id, "num": kwargs.get("num", 10)}
+        service = build("customsearch", "v1", developerKey=self.settings.api.google_search_api_key)
+        params = {"q": query, "cx": self.settings.api.google_search_engine_id, "num": kwargs.get("num", 10)}
         res = service.cse().list(**params).execute()
         items = res.get("items", [])
         return [self._normalize_item(i) for i in items]
