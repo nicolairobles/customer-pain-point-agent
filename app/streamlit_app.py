@@ -39,7 +39,7 @@ def main() -> None:
         if run_agent is None:
             st.warning(
                 "The LangChain agent dependencies are not available in this environment. "
-                "See the 1.3.x stories for installation/pinning guidance."
+                "See the README.md or docs/setup.md for installation instructions."
             )
             return
 
