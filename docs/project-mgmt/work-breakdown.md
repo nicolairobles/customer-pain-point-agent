@@ -466,4 +466,98 @@ Story Link:
 [Detailed Story](https://github.com/nicolairobles/customer-pain-point-agent/blob/master/docs/stories/2.4.3-enhance-ui-feedback.md)
 
 ```
+PHASE 3: ENHANCEMENT & POLISH
+
+```
+Activity ID: 3.1.1
+Activity: Harden error handling and retries
+Description: Introduce resilient error handling, structured logging, and retry/backoff policies.
+Work Package: 3.1 Error Handling & Retry Logic
+Duration: 3 hours
+Owner: TBD
+Issue Link:
+```
+[Generated Issue](https://github.com/nicolairobles/customer-pain-point-agent/blob/master/issues/generated/3.1.1_harden-error-handling-and-retries.md)
+
+```
+Activity ID: 3.2.1
+Activity: Optimize agent performance
+Description: Profile and improve end-to-end latency with caching, concurrency, and instrumentation.
+Work Package: 3.2 Performance Optimization
+Duration: 3 hours
+Owner: TBD
+Issue Link:
+```
+[Generated Issue](https://github.com/nicolairobles/customer-pain-point-agent/blob/master/issues/generated/3.2.1_optimize-agent-performance.md)
+
+```
+Activity ID: 3.3.1
+Activity: Enhance Streamlit UX
+Description: Improve accessibility, responsive layout, and micro-interactions in the Streamlit app.
+Work Package: 3.3 UI/UX Improvements
+Duration: 2 hours
+Owner: TBD
+Issue Link:
+```
+[Generated Issue](https://github.com/nicolairobles/customer-pain-point-agent/blob/master/issues/generated/3.3.1_enhance-streamlit-ux.md)
+
+```
+Activity ID: 3.4.1
+Activity: Expand automated test coverage
+Description: Build comprehensive integration, regression, and coverage tooling for the agent.
+Work Package: 3.4 Comprehensive Testing
+Duration: 3 hours
+Owner: TBD
+Issue Link:
+```
+[Generated Issue](https://github.com/nicolairobles/customer-pain-point-agent/blob/master/issues/generated/3.4.1_expand-test-coverage.md)
+
+```
+PHASE 4: DEPLOYMENT & DOCUMENTATION
+
+```
+Activity ID: 4.1.1
+Activity: Prepare production deployment
+Description: Automate deployment and monitoring for the Streamlit application.
+Work Package: 4.1 Production Deployment
+Duration: 3 hours
+Owner: TBD
+Issue Link:
+```
+[Generated Issue](https://github.com/nicolairobles/customer-pain-point-agent/blob/master/issues/generated/4.1.1_prepare-production-deployment.md)
+
+```
+Activity ID: 4.2.1
+Activity: Complete project documentation
+Description: Finalise setup, user, and developer documentation for launch.
+Work Package: 4.2 Documentation
+Duration: 2 hours
+Owner: TBD
+Issue Link:
+```
+[Generated Issue](https://github.com/nicolairobles/customer-pain-point-agent/blob/master/issues/generated/4.2.1_complete-project-documentation.md)
+
+```
+Activity ID: 4.3.1
+Activity: Create demo video
+Description: Script and produce a polished walkthrough video for stakeholders.
+Work Package: 4.3 Demo Video Creation
+Duration: 2 hours
+Owner: TBD
+Issue Link:
+```
+[Generated Issue](https://github.com/nicolairobles/customer-pain-point-agent/blob/master/issues/generated/4.3.1_create-demo-video.md)
+
+```
+Activity ID: 4.4.1
+Activity: Conduct team knowledge transfer
+Description: Share project knowledge, onboard successors, and define support rotation.
+Work Package: 4.4 Team Knowledge Transfer
+Duration: 1.5 hours
+Owner: TBD
+Issue Link:
+```
+[Generated Issue](https://github.com/nicolairobles/customer-pain-point-agent/blob/master/issues/generated/4.4.1_conduct-team-knowledge-transfer.md)
+
+```
 
