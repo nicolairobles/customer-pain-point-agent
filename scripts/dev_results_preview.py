@@ -6,7 +6,15 @@ the full LangChain agent stack (which currently requires additional refactoring)
 
 from __future__ import annotations
 
+import pathlib
+import sys
+
 import streamlit as st
+
+# Ensure repository root is on sys.path when run via `streamlit run scripts/...`
+REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 from app.components.results_display import render_results
 
