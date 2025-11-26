@@ -16,7 +16,7 @@
    - `st.markdown` block with the copy: *“What’s eating you? Enter your pain point in the prompt below…”*
    - Typography: `Lato` regular, 20 px (desktop) / 18 px (mobile), line height 1.6, color `#efeaf2`.
 4. **Query Input Zone**
-   - Wrap `st.text_input` inside `st.columns([0.15, 0.7, 0.15])` so the pill stays centered at large widths.
+   - Wrap `st.text_area` inside `st.columns([0.15, 0.7, 0.15])` so the pill stays centered at large widths.
    - Use custom CSS (in 1.4.2) to style:
      - Background `#efeaf2`
      - Border radius `999px`

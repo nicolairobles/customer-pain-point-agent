@@ -7,6 +7,8 @@ import streamlit as st
 # Streamlit keys are centralized to avoid accidental collisions.
 QUERY_INPUT_KEY = "query_input_text"
 EXAMPLE_SELECT_KEY = "query_input_example_select"
+IS_VALID_KEY = "query_input_is_valid"
+WORD_COUNT_KEY = "query_input_word_count"
 
 # Validation constraints are defined once to keep UI, tests, and downstream logic aligned.
 WORD_MIN = 1
@@ -84,8 +86,8 @@ def render_query_input() -> str:
         st.caption(f"{word_count} / {WORD_MAX} words")
 
         is_valid, error_message = validate_query(clean_query)
-        st.session_state["query_input_is_valid"] = is_valid  # Downstream components can read this flag.
-        st.session_state["query_input_word_count"] = word_count
+        st.session_state[IS_VALID_KEY] = is_valid  # Downstream components can read this flag.
+        st.session_state[WORD_COUNT_KEY] = word_count
 
         feedback = st.empty()
         if word_count == 0:
