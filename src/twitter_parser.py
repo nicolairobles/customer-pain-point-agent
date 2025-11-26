@@ -1,4 +1,5 @@
 # src/twitter_parser.py
+
 import re
 import logging
 from typing import List, Dict
@@ -7,10 +8,6 @@ from src.twitter_api_wrapper import NormalizedTweet
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
-handler = logging.StreamHandler()
-formatter = logging.Formatter("[%(asctime)s] %(levelname)s: %(message)s")
-handler.setFormatter(formatter)
-logger.addHandler(handler)
 
 URL_PATTERN = re.compile(r"https?://\S+")
 MARKDOWN_UNSAFE = re.compile(r"[*_~`>|\\]")
@@ -40,10 +37,9 @@ def parse_tweets(raw_tweets: List[NormalizedTweet]) -> List[Dict]:
             continue
 
         clean_text = sanitize_text(tweet.text)
-
         timestamp = tweet.created_at.astimezone(timezone.utc).isoformat() if tweet.created_at else None
 
-        parsed.append({
+        parsed_tweet = {
             "id": tweet_id,
             "text": clean_text,
             "author_handle": tweet.author_handle,
@@ -54,6 +50,6 @@ def parse_tweets(raw_tweets: List[NormalizedTweet]) -> List[Dict]:
             "reply_count": tweet.reply_count,
             "language": tweet.language,
             "platform": "twitter"
-        })
-
+        }
+        parsed.append(parsed_tweet)
     return parsed

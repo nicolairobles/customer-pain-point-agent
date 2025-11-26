@@ -1,6 +1,7 @@
 # tests/test_twitter_tool.py
+
 import pytest
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 from src.twitter_tool import search_twitter
 from src.twitter_api_wrapper import NormalizedTweet
 
@@ -20,7 +21,7 @@ def mock_tweets():
     ]
 
 def test_search_twitter_success(mock_tweets):
-    with patch("src.twitter_tool.TwitterAPIWrapper") as MockWrapper:
+    with patch("twitter_tool.TwitterAPIWrapper") as MockWrapper:
         instance = MockWrapper.return_value
         instance.search_tweets.return_value = mock_tweets
         result = search_twitter("test query")
@@ -28,20 +29,21 @@ def test_search_twitter_success(mock_tweets):
         assert result[0].text == "Test tweet"
 
 def test_search_twitter_zero_results():
-    with patch("src.twitter_tool.TwitterAPIWrapper") as MockWrapper:
+    with patch("twitter_tool.TwitterAPIWrapper") as MockWrapper:
         instance = MockWrapper.return_value
         instance.search_tweets.return_value = []
         result = search_twitter("no results query")
         assert result == []
 
 def test_search_twitter_auth_failure():
-    with patch("src.twitter_tool.TwitterAPIWrapper.__init__", side_effect=ValueError("Missing credentials")):
+    with patch("twitter_tool.TwitterAPIWrapper.__init__", side_effect=ValueError("Missing credentials")):
         import pytest
         with pytest.raises(ValueError):
             search_twitter("test query")
 
 def test_search_twitter_rate_limit_retry(mock_tweets, caplog):
-    with patch("src.twitter_tool.TwitterAPIWrapper.search_tweets", side_effect=[Exception("Rate limit"), mock_tweets]):
+    import time
+    with patch("twitter_tool.TwitterAPIWrapper.search_tweets", side_effect=[Exception("Rate limit"), mock_tweets]):
         result = search_twitter("retry query", max_results=1)
         assert result == mock_tweets
         assert any("Retrying" in r.message for r in caplog.records)

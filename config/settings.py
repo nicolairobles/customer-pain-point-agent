@@ -10,6 +10,15 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+
+from .api_settings import TWITTER_BEARER_TOKEN, TWITTER_CLIENT_ID, TWITTER_CLIENT_SECRET
+
+api_settings = {
+    "bearer_token": TWITTER_BEARER_TOKEN,
+    "client_id": TWITTER_CLIENT_ID,
+    "client_secret": TWITTER_CLIENT_SECRET
+}
+
 @dataclass(frozen=True)
 class APISettings:
     """Holds API credential configuration for external services."""
