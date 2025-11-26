@@ -13,42 +13,43 @@ _STYLE_SESSION_KEY = "results_component_styles_loaded"
 _RESULTS_STYLE = """
 <style>
 .pp-results-metrics {
-    background: rgba(239, 234, 242, 0.85);
+    background: var(--color-surface);
     border-radius: 16px;
     padding: 18px;
-    color: #2d1b3d;
+    color: var(--color-text-primary);
+    box-shadow: var(--shadow-md);
 }
 .pp-results-metrics h4 {
     margin: 0;
     font-size: 0.95rem;
     text-transform: uppercase;
     letter-spacing: 0.08em;
-    color: #7a708b;
+    color: var(--color-text-secondary);
 }
 .pp-results-metrics p {
     margin: 6px 0 0;
     font-size: 1.35rem;
     font-weight: 700;
-    color: #2d1b3d;
+    color: var(--color-text-primary);
 }
 .pp-card {
-    background: rgba(239, 234, 242, 0.92);
-    border-radius: 18px;
-    padding: 20px 24px;
-    color: #2d1b3d;
-    box-shadow: 0 12px 24px rgba(27, 14, 33, 0.08);
-    margin-bottom: 12px;
+    background: var(--color-surface);
+    border-radius: 20px;
+    padding: 22px 26px;
+    color: var(--color-text-primary);
+    box-shadow: var(--shadow-md);
+    margin-bottom: 18px;
 }
 .pp-card p {
     margin: 0 0 12px;
-    line-height: 1.5;
+    line-height: 1.55;
 }
 .pp-card .pp-frequency {
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    font-size: 0.85rem;
-    color: #7a708b;
+    font-size: 0.82rem;
+    color: var(--color-text-secondary);
 }
 .pp-card ul {
     margin: 0 0 8px 18px;
@@ -58,7 +59,14 @@ _RESULTS_STYLE = """
 }
 .pp-citations {
     font-size: 0.9rem;
-    color: #4b3b61;
+    color: var(--color-text-secondary);
+}
+.pp-citations a {
+    color: var(--color-accent);
+    text-decoration: none;
+}
+.pp-citations a:hover {
+    text-decoration: underline;
 }
 </style>
 """

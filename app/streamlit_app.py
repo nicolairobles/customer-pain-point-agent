@@ -15,6 +15,7 @@ if str(REPO_ROOT) not in sys.path:
 from src.utils.validators import ValidationError, validate_query_length
 from app.components.query_input import render_query_input
 from app.components.results_display import render_results
+from app.theme import apply_global_styles
 try:
     from src.agent.pain_point_agent import run_agent
 except ImportError:  # pragma: no cover - executed in environments without agent deps
@@ -26,6 +27,7 @@ st.set_page_config(page_title="Customer Pain Point Discovery", layout="wide")
 def main() -> None:
     """Render the Streamlit application."""
 
+    apply_global_styles()
     st.title("Customer Pain Point Discovery Agent")
     query = render_query_input()
 
