@@ -214,6 +214,7 @@ def test_normalized_schema_matches_pydantic_model(monkeypatch, settings):
 
     assert results, "Expected at least one normalized result"
     validated = RedditPost(**results[0])
-    serialized = json.dumps(validated.model_dump())
+    model_dict = validated.model_dump() if hasattr(validated, "model_dump") else validated.dict()
+    serialized = json.dumps(model_dict)
 
-    assert json.loads(serialized) == validated.model_dump()
+    assert json.loads(serialized) == model_dict
