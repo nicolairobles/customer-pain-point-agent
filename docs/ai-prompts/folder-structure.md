@@ -8,7 +8,7 @@ I'm building a **Customer Pain Point Discovery Agent** - an AI-powered tool that
 - **Primary Framework**: LangChain (for agent orchestration)
 - **LLM**: OpenAI GPT (for pain point extraction and categorization)
 - **UI**: Streamlit
-- **Language**: Python 3.10+
+- **Language**: Python 3.11.x
 - **APIs**: Reddit API, Twitter API, Google Search API
 - **Deployment**: Streamlit Cloud
 
