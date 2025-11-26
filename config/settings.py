@@ -23,6 +23,15 @@ class APISettings:
     google_search_api_key: str = os.getenv("GOOGLE_SEARCH_API_KEY", "")
     google_search_engine_id: str = os.getenv("GOOGLE_SEARCH_ENGINE_ID", "")
 
+    def validate_required(self, names: list[str]) -> None:
+        """Raise RuntimeError if any of the named API config values are missing.
+
+        Example: `settings.api.validate_required(["google_search_api_key"])`
+        """
+        missing = [n for n in names if not getattr(self, n, None)]
+        if missing:
+            raise RuntimeError(f"Missing required API settings: {', '.join(missing)}")
+
 
 @dataclass(frozen=True)
 class AgentSettings:

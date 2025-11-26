@@ -20,7 +20,7 @@ def test_tool_factory_methods() -> None:
 
 @pytest.mark.parametrize(
     "tool_class",
-    [TwitterTool, GoogleSearchTool],
+    [TwitterTool],
 )
 def test_tool_run_not_implemented(tool_class) -> None:
     """Placeholder ensuring run methods raise not implemented until defined."""
