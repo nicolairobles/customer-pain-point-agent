@@ -16,7 +16,7 @@ from dotenv import load_dotenv
 
 try:
     from googleapiclient.discovery import build
-except Exception as e:  # pragma: no cover - helpful error message
+except ImportError:  # pragma: no cover - helpful error message
     print("Missing dependency `google-api-python-client`. Install with `pip install google-api-python-client`.")
     raise
 
@@ -28,6 +28,11 @@ def run_search(api_key: str, cse_id: str, query: str, num: int = 5):
 
 
 def main():
+    """Run a simple smoke test.
+
+    Note: avoid including sensitive data in the query string. The output
+    may be saved to `examples/` and should not contain secrets.
+    """
     load_dotenv()
 
     parser = argparse.ArgumentParser()

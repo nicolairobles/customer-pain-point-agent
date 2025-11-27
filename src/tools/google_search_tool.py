@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 import logging
 from pydantic import PrivateAttr
 
@@ -10,6 +10,12 @@ from config.settings import Settings
 
 
 logger = logging.getLogger(__name__)
+
+try:  # pragma: no cover - optional dependency guard
+    from googleapiclient.errors import HttpError
+except Exception:  # pragma: no cover - library missing at import time
+    class HttpError(Exception):
+        """Fallback error type when googleapiclient is not installed."""
 
 
 class GoogleSearchTool(BaseTool):
@@ -64,13 +70,14 @@ class GoogleSearchTool(BaseTool):
         return cls(settings)
 
     def _normalize_item(self, item: Dict[str, Any]) -> Dict[str, Any]:
-        # Normalize keys to snake_case for Python consumers
+        """Return a consistent schema for Google Custom Search results."""
+
         return {
-            "title": item.get("title"),
-            "link": item.get("link"),
-            "snippet": item.get("snippet"),
-            "display_link": item.get("displayLink"),
-            "cache_id": item.get("cacheId"),
+            "title": item.get("title", ""),
+            "link": item.get("link", ""),
+            "snippet": item.get("snippet", ""),
+            "display_link": item.get("displayLink", ""),
+            "cache_id": item.get("cacheId", ""),
         }
 
     def _run(self, query: str, *args: Any, **kwargs: Any) -> List[Dict[str, Any]]:
@@ -84,14 +91,28 @@ class GoogleSearchTool(BaseTool):
                 "GoogleSearchTool is not configured with an API client. Ensure GOOGLE_SEARCH_API_KEY and GOOGLE_SEARCH_ENGINE_ID are set and google-api-python-client is installed."
             )
 
-        params = {"q": query, "cx": self.settings.api.google_search_engine_id, "num": kwargs.get("num", 10)}
+        requested_num = kwargs.get("num", 10)
+        try:
+            num = int(requested_num)
+        except (TypeError, ValueError):
+            num = 10
+
+        if num < 1:
+            num = 1
+
+        # Google Custom Search API caps the `num` parameter at 10 results.
+        num = min(num, 10)
+
+        params = {"q": query, "cx": self.settings.api.google_search_engine_id, "num": num}
 
         try:
             res = self._service.cse().list(**params).execute()
-        except Exception as e:
-            # Catch API/library specific exceptions and surface a helpful error
-            logger.exception("Google Custom Search API request failed")
-            raise RuntimeError(f"Google Custom Search request failed: {e}") from e
+        except HttpError as exc:
+            logger.exception("Google Custom Search API returned an HTTP error")
+            raise RuntimeError(f"Google Custom Search request failed: {exc}") from exc
+        except OSError as exc:
+            logger.exception("Google Custom Search API request encountered a network error")
+            raise RuntimeError(f"Google Custom Search request failed: {exc}") from exc
 
         items = res.get("items", [])
         return [self._normalize_item(i) for i in items]

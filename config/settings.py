@@ -23,14 +23,18 @@ class APISettings:
     google_search_api_key: str = os.getenv("GOOGLE_SEARCH_API_KEY", "")
     google_search_engine_id: str = os.getenv("GOOGLE_SEARCH_ENGINE_ID", "")
 
-    def validate_required(self, names: list[str]) -> None:
-        """Raise RuntimeError if any of the named API config values are missing.
+    # NOTE: validation helpers live outside the frozen dataclass to avoid
+    # surprising mutation/behavior. Use `validate_api_settings(api, [..])`.
 
-        Example: `settings.api.validate_required(["google_search_api_key"])`
-        """
-        missing = [n for n in names if not getattr(self, n, None)]
-        if missing:
-            raise RuntimeError(f"Missing required API settings: {', '.join(missing)}")
+
+def validate_api_settings(api: APISettings, names: list[str]) -> None:
+    """Raise RuntimeError if any of the named API config values are missing.
+
+    Example: `validate_api_settings(settings.api, ["google_search_api_key"])`
+    """
+    missing = [n for n in names if not getattr(api, n, None)]
+    if missing:
+        raise RuntimeError(f"Missing required API settings: {', '.join(missing)}")
 
 
 @dataclass(frozen=True)

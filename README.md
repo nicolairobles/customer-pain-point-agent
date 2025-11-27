@@ -1,5 +1,3 @@
-# Google API Setup
-# Customer Pain Point Discovery Agent
 # Customer Pain Point Discovery Agent
 
 An AI-powered agent that aggregates customer pain points from Reddit, Twitter, and Google Search, extracts structured insights, and presents them in a Streamlit dashboard.
