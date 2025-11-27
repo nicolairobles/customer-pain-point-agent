@@ -26,6 +26,12 @@
 - Behavior: searches subreddits concurrently, caps totals via `limit`/`per_subreddit`, sorts by relevance (score + comments), retries with backoff on errors, and returns an empty list on persistent failures while logging diagnostics.
 - Configuration: credentials provided via `Settings.api.reddit_client_id` and `Settings.api.reddit_client_secret`; optional `REDDIT_USER_AGENT` env var overrides default.
 
+## Twitter Tool Interface
+- Entry point: `TwitterTool._run(query, max_results=10, start_time=None, end_time=None, lang=None)` returns a list of normalized dictionaries.
+- Output schema fields: `text`, `author_handle`, `permalink`, `created_timestamp`, `like_count`, `repost_count`, `reply_count`, `language`.
+- Behavior: searches recent tweets using Twitter API v2, supports pagination via `next_token`, handles rate limits (300 requests/15min), normalizes raw tweet data to consistent schema.
+- Configuration: bearer token provided via `Settings.api.twitter_api_key`.
+
 ## Non-Functional Considerations
 - Environment-driven configuration loaded via `config.settings`.
 - Caching and retry strategies to be implemented within tool modules.
