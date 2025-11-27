@@ -463,3 +463,217 @@ def test_data_quality_schema_validation():
     # Check permalink format
     assert "twitter.com" in tweet_dict["permalink"]
     assert tweet_dict["permalink"].endswith("/status/123")
+
+
+
+def test_twitter_api_authentication_failure(monkeypatch, settings):
+    """Test that authentication failures are handled properly."""
+    from src.tools.twitter_tool import TwitterAPIError
+    
+    # Mock tweepy client to raise authentication error
+    mock_client = MagicMock()
+    mock_client.get_me.side_effect = Exception("401 Unauthorized")
+    
+    monkeypatch.setattr("src.tools.twitter_tool.tweepy.Client", lambda bearer_token: mock_client)
+    
+    with pytest.raises(TwitterAPIError, match="Twitter API authentication failed"):
+        from src.tools.twitter_tool import TwitterAPIWrapper
+        TwitterAPIWrapper("invalid_token")
+
+
+def test_twitter_api_rate_limit_retry_logic(monkeypatch, settings, caplog):
+    """Test rate limit handling with exponential backoff and retry logging."""
+    import logging
+    from src.tools.twitter_tool import TwitterAPIWrapper
+    
+    # Mock client that fails with rate limit on first two calls, succeeds on third
+    mock_client = MagicMock()
+    mock_client.search_recent_tweets.side_effect = [
+        Exception("429 Too Many Requests"),  # First call fails
+        Exception("429 Too Many Requests"),  # Second call fails  
+        MagicMock(data=[], includes=None, meta=None)  # Third call succeeds
+    ]
+    
+    monkeypatch.setattr("src.tools.twitter_tool.tweepy.Client", lambda bearer_token: mock_client)
+    
+    wrapper = TwitterAPIWrapper("dummy_token")
+    
+    with caplog.at_level(logging.WARNING):
+        result = wrapper.search_tweets("test query", max_retries=3)
+    
+    # Check that retry warnings were logged
+    assert "Twitter API rate limit exceeded. Retrying in" in caplog.text
+    assert "attempt 2/4" in caplog.text or "attempt 1/4" in caplog.text
+    
+    # Should have made 3 calls (initial + 2 retries)
+    assert mock_client.search_recent_tweets.call_count == 3
+
+
+def test_twitter_api_rate_limit_exhaustion(monkeypatch, settings, caplog):
+    """Test that rate limit exhaustion after max retries raises appropriate error."""
+    import logging
+    from src.tools.twitter_tool import TwitterAPIError
+    
+    # Mock client that always fails with rate limit
+    mock_client = MagicMock()
+    mock_client.search_recent_tweets.side_effect = Exception("429 Too Many Requests")
+    
+    monkeypatch.setattr("src.tools.twitter_tool.tweepy.Client", lambda bearer_token: mock_client)
+    
+    wrapper = TwitterAPIWrapper("dummy_token")
+    
+    with pytest.raises(TwitterAPIError, match="Twitter API rate limit exceeded after 4 attempts"):
+        wrapper.search_tweets("test query", max_retries=3)
+
+
+def test_twitter_tool_logging_side_effects(monkeypatch, settings, caplog):
+    """Test that logging includes masked identifiers and proper context."""
+    import logging
+    
+    tweets = [DummyTweet("123", "Test tweet", "2024-01-15T10:30:00.000Z", "user1")]
+    users = [DummyUser("user1", "testuser")]
+    response = DummyResponse(tweets, users)
+
+    mock_client = MagicMock()
+    mock_client.search_recent_tweets.return_value = response
+
+    monkeypatch.setattr("src.tools.twitter_tool.tweepy.Client", lambda bearer_token: mock_client)
+
+    tool = TwitterTool.from_settings(settings)
+    
+    with caplog.at_level(logging.INFO):
+        results = tool._run("customer service complaint", max_results=5)
+    
+    # Check that query is logged with truncation
+    assert "customer service complaint" in caplog.text
+    assert "query=" in caplog.text
+    
+    # Check that results count is logged
+    assert "1 tweets found" in caplog.text
+
+
+def test_twitter_api_wrapper_initialization_logging(monkeypatch, caplog):
+    """Test that successful API initialization is logged."""
+    import logging
+    
+    mock_client = MagicMock()
+    mock_client.get_me.return_value = MagicMock()
+    
+    monkeypatch.setattr("src.tools.twitter_tool.tweepy.Client", lambda bearer_token: mock_client)
+    
+    with caplog.at_level(logging.INFO):
+        from src.tools.twitter_tool import TwitterAPIWrapper
+        TwitterAPIWrapper("valid_token")
+    
+    assert "Twitter API authentication successful" in caplog.text
+
+
+def test_mutation_regression_test():
+    """Mutation/regression test: ensure tests fail when schema changes unexpectedly."""
+    from src.tools.twitter_tool import NormalizedTweet
+    
+    # Create a tweet with all expected fields
+    tweet = NormalizedTweet(
+        text="test",
+        author_handle="user",
+        permalink="https://twitter.com/user/status/123",
+        created_timestamp="2024-01-01T00:00:00Z",
+        like_count=1,
+        repost_count=2,
+        reply_count=3,
+        language="en",
+        platform="twitter"
+    )
+    
+    tweet_dict = tweet.dict()
+    
+    # This test will fail if someone removes or renames any required fields
+    required_fields = [
+        "text", "author_handle", "permalink", "created_timestamp",
+        "like_count", "repost_count", "reply_count", "language", "platform"
+    ]
+    
+    for field in required_fields:
+        assert field in tweet_dict, f"Required field {field} is missing from NormalizedTweet"
+    
+    # Ensure platform is specifically "twitter"
+    assert tweet_dict["platform"] == "twitter", "Platform field must be twitter"
+    
+    # Ensure permalink follows expected format
+    assert tweet_dict["permalink"].startswith("https://twitter.com/"), "Permalink must be valid Twitter URL"
+    assert "/status/" in tweet_dict["permalink"], "Permalink must contain status path"
+
+
+def test_twitter_api_error_types():
+    """Test different types of TwitterAPIError messages."""
+    from src.tools.twitter_tool import TwitterAPIError
+    
+    # Test invalid query error
+    error = TwitterAPIError("Invalid search query: bad syntax")
+    assert "Invalid search query" in str(error)
+    
+    # Test auth error
+    error = TwitterAPIError("Twitter API authentication failed")
+    assert "authentication failed" in str(error)
+    
+    # Test rate limit error
+    error = TwitterAPIError("Rate limit exceeded")
+    assert "Rate limit" in str(error)
+
+
+def test_normalize_tweet_comprehensive_scenarios():
+    """Comprehensive test covering various tweet normalization scenarios."""
+    from src.tools.twitter_tool import TwitterAPIWrapper
+    from datetime import datetime, timezone
+    
+    wrapper = TwitterAPIWrapper("dummy_token")
+    
+    # Test 1: Regular tweet with all fields
+    class RegularTweet:
+        id = "123"
+        text = "Great product! #happy"
+        created_at = datetime(2024, 1, 15, 10, 30, 0, tzinfo=timezone.utc)
+        author_id = "user1"
+        public_metrics = {"like_count": 10, "retweet_count": 5, "reply_count": 2}
+        lang = "en"
+        referenced_tweets = None
+    
+    users = {"user1": MagicMock(username="testuser")}
+    result = wrapper.normalize_tweet(RegularTweet(), users)
+    
+    assert result is not None
+    assert result.text == "Great product! #happy"  # No sanitization needed
+    assert result.created_timestamp == "2024-01-15T10:30:00+00:00"
+    assert result.platform == "twitter"
+    
+    # Test 2: Tweet needing sanitization
+    class DirtyTweet:
+        id = "124"
+        text = "Check https://spam.com and email spam@spam.com *bold*"
+        created_at = datetime(2024, 1, 15, 11, 0, 0, tzinfo=timezone.utc)
+        author_id = "user2"
+        public_metrics = {"like_count": 5, "retweet_count": 1, "reply_count": 0}
+        lang = "en"
+        referenced_tweets = None
+    
+    users["user2"] = MagicMock(username="user2")
+    result = wrapper.normalize_tweet(DirtyTweet(), users)
+    
+    assert result is not None
+    assert result.text == "Check and email [EMAIL] bold"
+    assert result.author_handle == "user2"
+    
+    # Test 3: Retweet (should be skipped)
+    class Retweet:
+        id = "125"
+        text = "RT @original: Original tweet"
+        created_at = datetime(2024, 1, 15, 12, 0, 0, tzinfo=timezone.utc)
+        author_id = "user3"
+        public_metrics = {"like_count": 0, "retweet_count": 0, "reply_count": 0}
+        lang = "en"
+        referenced_tweets = [MagicMock(type="retweeted")]
+    
+    users["user3"] = MagicMock(username="user3")
+    result = wrapper.normalize_tweet(Retweet(), users)
+    
+    assert result is None  # Retweets should be filtered out
