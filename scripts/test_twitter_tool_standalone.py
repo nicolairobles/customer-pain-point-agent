@@ -4,12 +4,9 @@ Standalone Twitter Tool Test (No LangChain Dependencies)
 Tests core functionality without LangChain integration.
 """
 
-import os
 import sys
 import pathlib
 from dataclasses import dataclass
-from typing import List, Optional
-from datetime import datetime
 
 # Set up paths like other scripts
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -28,6 +25,7 @@ class NormalizedTweet:
     repost_count: int
     reply_count: int
     language: str
+    platform: str = "twitter"
 
     def dict(self) -> dict:
         """Convert to dictionary for JSON serialization."""
@@ -39,7 +37,8 @@ class NormalizedTweet:
             'like_count': self.like_count,
             'repost_count': self.repost_count,
             'reply_count': self.reply_count,
-            'language': self.language
+            'language': self.language,
+            'platform': self.platform
         }
 
 class TwitterAPIError(Exception):
@@ -131,6 +130,7 @@ def test_core_functionality():
         # Test valid key format (mock)
         try:
             wrapper = TwitterAPIWrapper("AAAAAAAAAAAAAAAAAAAAAATESTKEY123456789")
+            assert isinstance(wrapper, TwitterAPIWrapper), "Wrapper is not an instance of TwitterAPIWrapper"
             print("   ✅ Valid key format accepted")
         except Exception as e:
             print(f"   ❌ Valid key rejected: {e}")

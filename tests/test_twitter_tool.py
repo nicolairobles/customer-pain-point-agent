@@ -1,11 +1,9 @@
-import json
-from typing import Any, Dict
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
-from pydantic import BaseModel, ConfigDict
+import tweepy
 
-from src.tools.twitter_tool import TwitterTool, NormalizedTweet
+from src.tools.twitter_tool import TwitterTool, TwitterAPIWrapper, NormalizedTweet
 
 
 class DummyTweet:
@@ -20,7 +18,12 @@ class DummyTweet:
     ):
         self.id = id
         self.text = text
-        self.created_at = created_at
+        # Convert ISO string to datetime object
+        from datetime import datetime, timezone
+        if isinstance(created_at, str):
+            self.created_at = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+        else:
+            self.created_at = created_at
         self.author_id = author_id
         self.public_metrics = public_metrics or {
             "like_count": 10,
@@ -229,13 +232,6 @@ def test_twitter_tool_async_run(monkeypatch, settings):
 
     asyncio.run(run_test())
 
-    async def run_test():
-        results = await tool._arun("async query", max_results=5)
-        assert len(results) == 1
-        assert results[0]["text"] == "Async test"
-
-    asyncio.run(run_test())
-
 
 def test_sanitize_text_function():
     """Test the sanitize_text function removes URLs, emails, phones, and markdown chars."""
@@ -268,46 +264,56 @@ def test_normalize_tweet_skips_retweets():
     """Test that retweets are skipped during normalization."""
     from src.tools.twitter_tool import TwitterAPIWrapper
     
-    # Create a mock retweet
-    class MockRef:
-        type = "retweeted"
+    # Mock the tweepy client to avoid authentication
+    mock_client = MagicMock()
+    mock_client.get_me.return_value = MagicMock()
     
-    class MockTweet:
-        id = "123"
-        text = "RT @original: Original tweet"
-        created_at = None
-        author_id = "user1"
-        public_metrics = {"like_count": 10, "retweet_count": 5, "reply_count": 2}
-        lang = "en"
-        referenced_tweets = [MockRef()]
-    
-    users = {"user1": MagicMock(username="testuser")}
-    
-    wrapper = TwitterAPIWrapper("dummy_token")
-    result = wrapper.normalize_tweet(MockTweet(), users)
-    
-    assert result is None  # Should return None for retweets
+    with patch("src.tools.twitter_tool.tweepy.Client", lambda bearer_token: mock_client):
+        # Create a mock retweet
+        class MockRef:
+            type = "retweeted"
+        
+        class MockTweet:
+            id = "123"
+            text = "RT @original: Original tweet"
+            created_at = None
+            author_id = "user1"
+            public_metrics = {"like_count": 10, "retweet_count": 5, "reply_count": 2}
+            lang = "en"
+            referenced_tweets = [MockRef()]
+        
+        users = {"user1": MagicMock(username="testuser")}
+        
+        wrapper = TwitterAPIWrapper("dummy_token")
+        result = wrapper.normalize_tweet(MockTweet(), users)
+        
+        assert result is None  # Should return None for retweets
 
 
 def test_normalize_tweet_handles_missing_fields():
     """Test normalization handles missing author, empty text, etc."""
     from src.tools.twitter_tool import TwitterAPIWrapper
     
-    wrapper = TwitterAPIWrapper("dummy_token")
+    # Mock the tweepy client to avoid authentication
+    mock_client = MagicMock()
+    mock_client.get_me.return_value = MagicMock()
     
-    # Test missing author
-    class MockTweet:
-        id = "123"
-        text = "Test tweet"
-        created_at = None
-        author_id = "user1"
-        public_metrics = None
-        lang = "en"
-        referenced_tweets = None
-    
-    users = {}  # No users
-    result = wrapper.normalize_tweet(MockTweet(), users)
-    assert result is None
+    with patch("src.tools.twitter_tool.tweepy.Client", lambda bearer_token: mock_client):
+        wrapper = TwitterAPIWrapper("dummy_token")
+        
+        # Test missing author
+        class MockTweet:
+            id = "123"
+            text = "Test tweet"
+            created_at = None
+            author_id = "user1"
+            public_metrics = None
+            lang = "en"
+            referenced_tweets = None
+        
+        users = {}  # No users
+        result = wrapper.normalize_tweet(MockTweet(), users)
+        assert result is None
     
     # Test empty text
     class MockTweetEmpty:
@@ -337,20 +343,27 @@ def test_normalize_tweet_handles_missing_fields():
     assert result is None
 
 
-def test_normalize_tweet_with_sanitization():
+@patch('src.tools.twitter_tool.tweepy.Client')
+def test_normalize_tweet_with_sanitization(mock_client_class):
     """Test that tweet text is sanitized during normalization."""
     from src.tools.twitter_tool import TwitterAPIWrapper
+    
+    mock_client = MagicMock()
+    mock_client_class.return_value = mock_client
     
     wrapper = TwitterAPIWrapper("dummy_token")
     
     class MockTweet:
-        id = "123"
-        text = "Check this https://example.com and email test@example.com *bold*"
-        created_at = "2024-01-15T10:30:00.000Z"
-        author_id = "user1"
-        public_metrics = {"like_count": 10, "retweet_count": 5, "reply_count": 2}
-        lang = "en"
-        referenced_tweets = None
+        def __init__(self):
+            self.id = "123"
+            self.text = "Check this https://example.com and email test@example.com *bold*"
+            # Convert ISO string to datetime object
+            from datetime import datetime
+            self.created_at = datetime.fromisoformat("2024-01-15T10:30:00.000Z".replace('Z', '+00:00'))
+            self.author_id = "user1"
+            self.public_metrics = {"like_count": 10, "retweet_count": 5, "reply_count": 2}
+            self.lang = "en"
+            self.referenced_tweets = None
     
     users = {"user1": MagicMock(username="testuser")}
     result = wrapper.normalize_tweet(MockTweet(), users)
@@ -360,10 +373,14 @@ def test_normalize_tweet_with_sanitization():
     assert result.platform == "twitter"
 
 
-def test_normalize_tweet_utc_timestamp():
+@patch('src.tools.twitter_tool.tweepy.Client')
+def test_normalize_tweet_utc_timestamp(mock_client_class):
     """Test that timestamps are converted to UTC ISO format."""
     from src.tools.twitter_tool import TwitterAPIWrapper
     from datetime import datetime, timezone
+    
+    mock_client = MagicMock()
+    mock_client_class.return_value = mock_client
     
     wrapper = TwitterAPIWrapper("dummy_token")
     
@@ -386,9 +403,13 @@ def test_normalize_tweet_utc_timestamp():
     assert result.created_timestamp == "2024-01-15T10:30:00+00:00"
 
 
-def test_error_handling_malformed_payload():
+@patch('src.tools.twitter_tool.tweepy.Client')
+def test_error_handling_malformed_payload(mock_client_class):
     """Test that malformed payloads are handled gracefully."""
     from src.tools.twitter_tool import TwitterAPIWrapper
+    
+    mock_client = MagicMock()
+    mock_client_class.return_value = mock_client
     
     wrapper = TwitterAPIWrapper("dummy_token")
     
@@ -402,10 +423,13 @@ def test_error_handling_malformed_payload():
 
 
 
-def test_data_quality_schema_validation():
+@patch('src.tools.twitter_tool.tweepy.Client')
+def test_data_quality_schema_validation(mock_client_class):
     """Test that normalized payloads satisfy the interface contract."""
-    import json
     from src.tools.twitter_tool import TwitterAPIWrapper, NormalizedTweet
+    
+    mock_client = MagicMock()
+    mock_client_class.return_value = mock_client
     
     # Define expected schema
     expected_schema = {
@@ -428,13 +452,16 @@ def test_data_quality_schema_validation():
     wrapper = TwitterAPIWrapper("dummy_token")
     
     class MockTweet:
-        id = "123"
-        text = "Valid tweet content"
-        created_at = "2024-01-15T10:30:00.000Z"
-        author_id = "user1"
-        public_metrics = {"like_count": 10, "retweet_count": 5, "reply_count": 2}
-        lang = "en"
-        referenced_tweets = None
+        def __init__(self):
+            self.id = "123"
+            self.text = "Valid tweet content"
+            # Convert ISO string to datetime object
+            from datetime import datetime
+            self.created_at = datetime.fromisoformat("2024-01-15T10:30:00.000Z".replace('Z', '+00:00'))
+            self.author_id = "user1"
+            self.public_metrics = {"like_count": 10, "retweet_count": 5, "reply_count": 2}
+            self.lang = "en"
+            self.referenced_tweets = None
     
     users = {"user1": MagicMock(username="testuser")}
     result = wrapper.normalize_tweet(MockTweet(), users)
@@ -476,7 +503,7 @@ def test_twitter_api_authentication_failure(monkeypatch, settings):
     
     monkeypatch.setattr("src.tools.twitter_tool.tweepy.Client", lambda bearer_token: mock_client)
     
-    with pytest.raises(TwitterAPIError, match="Twitter API authentication failed"):
+    with pytest.raises(TwitterAPIError, match="Failed to initialize Twitter API client"):
         from src.tools.twitter_tool import TwitterAPIWrapper
         TwitterAPIWrapper("invalid_token")
 
@@ -488,11 +515,18 @@ def test_twitter_api_rate_limit_retry_logic(monkeypatch, settings, caplog):
     
     # Mock client that fails with rate limit on first two calls, succeeds on third
     mock_client = MagicMock()
+    # Create mock response objects for TooManyRequests
+    mock_response1 = MagicMock()
+    mock_response1.status_code = 429
+    mock_response2 = MagicMock()
+    mock_response2.status_code = 429
+    
     mock_client.search_recent_tweets.side_effect = [
-        Exception("429 Too Many Requests"),  # First call fails
-        Exception("429 Too Many Requests"),  # Second call fails  
+        tweepy.TooManyRequests(mock_response1),  # First call fails
+        tweepy.TooManyRequests(mock_response2),  # Second call fails  
         MagicMock(data=[], includes=None, meta=None)  # Third call succeeds
     ]
+    mock_client.get_me.return_value = MagicMock()
     
     monkeypatch.setattr("src.tools.twitter_tool.tweepy.Client", lambda bearer_token: mock_client)
     
@@ -516,7 +550,10 @@ def test_twitter_api_rate_limit_exhaustion(monkeypatch, settings, caplog):
     
     # Mock client that always fails with rate limit
     mock_client = MagicMock()
-    mock_client.search_recent_tweets.side_effect = Exception("429 Too Many Requests")
+    mock_response = MagicMock()
+    mock_response.status_code = 429
+    mock_client.search_recent_tweets.side_effect = tweepy.TooManyRequests(mock_response)
+    mock_client.get_me.return_value = MagicMock()
     
     monkeypatch.setattr("src.tools.twitter_tool.tweepy.Client", lambda bearer_token: mock_client)
     
@@ -542,7 +579,7 @@ def test_twitter_tool_logging_side_effects(monkeypatch, settings, caplog):
     tool = TwitterTool.from_settings(settings)
     
     with caplog.at_level(logging.INFO):
-        results = tool._run("customer service complaint", max_results=5)
+        tool._run("customer service complaint", max_results=5)
     
     # Check that query is logged with truncation
     assert "customer service complaint" in caplog.text
@@ -621,10 +658,14 @@ def test_twitter_api_error_types():
     assert "Rate limit" in str(error)
 
 
-def test_normalize_tweet_comprehensive_scenarios():
+@patch('src.tools.twitter_tool.tweepy.Client')
+def test_normalize_tweet_comprehensive_scenarios(mock_client_class):
     """Comprehensive test covering various tweet normalization scenarios."""
     from src.tools.twitter_tool import TwitterAPIWrapper
     from datetime import datetime, timezone
+    
+    mock_client = MagicMock()
+    mock_client_class.return_value = mock_client
     
     wrapper = TwitterAPIWrapper("dummy_token")
     

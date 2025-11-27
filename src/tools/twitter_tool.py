@@ -91,13 +91,12 @@ class TwitterAPIWrapper:
             # Test the connection with a minimal request
             self.client.get_me()
             logger.info("Twitter API authentication successful")
+        except tweepy.Unauthorized as e:
+            raise TwitterAPIError("Twitter API authentication failed: Invalid bearer token. Please check your TWITTER_API_KEY.")
+        except tweepy.Forbidden as e:
+            raise TwitterAPIError("Twitter API authentication failed: Access forbidden. Your bearer token may not have the required permissions.")
         except tweepy.TweepyException as e:
-            if "401" in str(e):
-                raise TwitterAPIError("Twitter API authentication failed: Invalid bearer token. Please check your TWITTER_API_KEY.")
-            elif "403" in str(e):
-                raise TwitterAPIError("Twitter API authentication failed: Access forbidden. Your bearer token may not have the required permissions.")
-            else:
-                raise TwitterAPIError(f"Twitter API authentication failed: {str(e)}")
+            raise TwitterAPIError(f"Twitter API authentication failed: {str(e)}")
         except Exception as e:
             raise TwitterAPIError(f"Failed to initialize Twitter API client: {str(e)}")
 
@@ -134,16 +133,15 @@ class TwitterAPIWrapper:
         start_dt = None
         end_dt = None
         if start_time:
-            from datetime import datetime
             start_dt = datetime.fromisoformat(start_time.replace('Z', '+00:00'))
         if end_time:
-            from datetime import datetime
             end_dt = datetime.fromisoformat(end_time.replace('Z', '+00:00'))
 
         # Implement retry logic with exponential backoff
         for attempt in range(max_retries + 1):
             try:
-                logger.info(f"Twitter API search attempt {attempt + 1}/{max_retries + 1} for query: '{full_query[:50]}...'")
+                sanitized_query = _URL_RE.sub("[URL]", full_query)
+                logger.debug(f"Twitter API search attempt {attempt + 1}/{max_retries + 1} for query: '{sanitized_query[:50]}...'")
 
                 response = self.client.search_recent_tweets(
                     query=full_query,
@@ -210,28 +208,28 @@ class TwitterAPIWrapper:
                     return None
         
         # Skip if no text or media-only (assuming if text is empty or just URLs)
-        if not tweet.text or not tweet.text.strip():
-            logger.debug(f"Skipping media-only or empty tweet: {tweet.id}")
+        if not hasattr(tweet, 'text') or not tweet.text or not tweet.text.strip():
+            logger.debug(f"Skipping media-only or empty tweet: {getattr(tweet, 'id', 'unknown')}")
             return None
         
-        author = users.get(tweet.author_id)
+        author = users.get(getattr(tweet, 'author_id', ''))
         author_handle = author.username if author else ""
         
         # Skip if no author
         if not author_handle:
-            logger.debug(f"Skipping tweet with missing author: {tweet.id}")
+            logger.debug(f"Skipping tweet with missing author: {getattr(tweet, 'id', 'unknown')}")
             return None
         
         sanitized_text = sanitize_text(tweet.text)
         
         # If after sanitization, text is empty, skip
         if not sanitized_text:
-            logger.debug(f"Skipping tweet with no content after sanitization: {tweet.id}")
+            logger.debug(f"Skipping tweet with no content after sanitization: {getattr(tweet, 'id', 'unknown')}")
             return None
         
         # Ensure timestamp is ISO 8601 UTC
         timestamp = ""
-        if tweet.created_at:
+        if hasattr(tweet, 'created_at') and tweet.created_at:
             # Ensure it's UTC
             if tweet.created_at.tzinfo is None:
                 # Assume UTC if naive
@@ -243,125 +241,12 @@ class TwitterAPIWrapper:
         return NormalizedTweet(
             text=sanitized_text,
             author_handle=author_handle,
-            permalink=f"https://twitter.com/{author_handle}/status/{tweet.id}",
+            permalink=f"https://twitter.com/{author_handle}/status/{getattr(tweet, 'id', '')}",
             created_timestamp=timestamp,
-            like_count=tweet.public_metrics.get("like_count", 0) if tweet.public_metrics else 0,
-            repost_count=tweet.public_metrics.get("retweet_count", 0) if tweet.public_metrics else 0,
-            reply_count=tweet.public_metrics.get("reply_count", 0) if tweet.public_metrics else 0,
-            language=tweet.lang or "",
-            platform="twitter"
-        )
-
-    def search_tweets(
-        self,
-        query: str,
-        max_results: int = 10,
-        start_time: Optional[str] = None,
-        end_time: Optional[str] = None,
-        lang: Optional[str] = None,
-        next_token: Optional[str] = None
-    ) -> Dict[str, Any]:
-        """Search tweets with pagination and query parameters.
-
-        Args:
-            query: Search query (supports hashtags, keywords, etc.)
-            max_results: Maximum results per request (10-100)
-            start_time: Start time in ISO 8601 format
-            end_time: End time in ISO 8601 format
-            lang: Language code (e.g., 'en')
-            next_token: Token for pagination
-
-        Returns:
-            Dict with 'tweets' list and 'next_token' if available
-        """
-        # Build query
-        full_query = query
-        if lang:
-            full_query += f" lang:{lang}"
-
-        # Convert times to datetime if provided
-        start_dt = None
-        end_dt = None
-        if start_time:
-            from datetime import datetime
-            start_dt = datetime.fromisoformat(start_time.replace('Z', '+00:00'))
-        if end_time:
-            from datetime import datetime
-            end_dt = datetime.fromisoformat(end_time.replace('Z', '+00:00'))
-
-        response = self.client.search_recent_tweets(
-            query=full_query,
-            max_results=min(max_results, 100),
-            start_time=start_dt,
-            end_time=end_dt,
-            next_token=next_token,
-            tweet_fields=["created_at", "public_metrics", "lang", "text", "author_id", "referenced_tweets"],
-            user_fields=["username"],
-            expansions=["author_id"]
-        )
-
-        tweets = []
-        users = {}
-        if response.data:
-            tweets = response.data
-            if response.includes and "users" in response.includes:
-                users = {user.id: user for user in response.includes["users"]}
-
-        return {
-            "tweets": tweets,
-            "users": users,
-            "next_token": response.meta.get("next_token") if response.meta else None
-        }
-
-    def normalize_tweet(self, tweet: tweepy.Tweet, users: Dict[str, tweepy.User]) -> Optional[NormalizedTweet]:
-        """Normalize raw tweet data to our schema."""
-        # Skip retweets
-        if hasattr(tweet, 'referenced_tweets') and tweet.referenced_tweets:
-            for ref in tweet.referenced_tweets:
-                if ref.type == 'retweeted':
-                    logger.debug(f"Skipping retweet: {tweet.id}")
-                    return None
-        
-        # Skip if no text or media-only (assuming if text is empty or just URLs)
-        if not tweet.text or not tweet.text.strip():
-            logger.debug(f"Skipping media-only or empty tweet: {tweet.id}")
-            return None
-        
-        author = users.get(tweet.author_id)
-        author_handle = author.username if author else ""
-        
-        # Skip if no author
-        if not author_handle:
-            logger.debug(f"Skipping tweet with missing author: {tweet.id}")
-            return None
-        
-        sanitized_text = sanitize_text(tweet.text)
-        
-        # If after sanitization, text is empty, skip
-        if not sanitized_text:
-            logger.debug(f"Skipping tweet with no content after sanitization: {tweet.id}")
-            return None
-        
-        # Ensure timestamp is ISO 8601 UTC
-        timestamp = ""
-        if tweet.created_at:
-            # Ensure it's UTC
-            if tweet.created_at.tzinfo is None:
-                # Assume UTC if naive
-                dt = tweet.created_at.replace(tzinfo=timezone.utc)
-            else:
-                dt = tweet.created_at.astimezone(timezone.utc)
-            timestamp = dt.isoformat()
-        
-        return NormalizedTweet(
-            text=sanitized_text,
-            author_handle=author_handle,
-            permalink=f"https://twitter.com/{author_handle}/status/{tweet.id}",
-            created_timestamp=timestamp,
-            like_count=tweet.public_metrics.get("like_count", 0) if tweet.public_metrics else 0,
-            repost_count=tweet.public_metrics.get("retweet_count", 0) if tweet.public_metrics else 0,
-            reply_count=tweet.public_metrics.get("reply_count", 0) if tweet.public_metrics else 0,
-            language=tweet.lang or "",
+            like_count=getattr(tweet, 'public_metrics', {}).get("like_count", 0) if hasattr(tweet, 'public_metrics') and tweet.public_metrics else 0,
+            repost_count=getattr(tweet, 'public_metrics', {}).get("retweet_count", 0) if hasattr(tweet, 'public_metrics') and tweet.public_metrics else 0,
+            reply_count=getattr(tweet, 'public_metrics', {}).get("reply_count", 0) if hasattr(tweet, 'public_metrics') and tweet.public_metrics else 0,
+            language=getattr(tweet, 'lang', '') or "",
             platform="twitter"
         )
 
@@ -369,25 +254,27 @@ class TwitterAPIWrapper:
 class TwitterTool(BaseTool):
     """Fetches relevant Twitter posts based on a user query."""
 
-    name = "twitter_search"
-    description = "Search Twitter for discussions related to customer pain points. Supports hashtags, keywords, language filters, and time windows."
+    name: str = "twitter_search"
+    description: str = "Search Twitter for discussions related to customer pain points. Supports hashtags, keywords, language filters, and time windows."
+    settings: Any
+    wrapper: TwitterAPIWrapper
 
     def __init__(self, settings: Settings) -> None:
-        super().__init__()
-        self.settings = settings
-
         # Validate settings has Twitter API key
         if not hasattr(settings, 'api') or not hasattr(settings.api, 'twitter_api_key'):
             raise TwitterAPIError("Twitter API key not found in settings. Please ensure TWITTER_API_KEY is set in your environment variables.")
 
         try:
-            self.wrapper = TwitterAPIWrapper(settings.api.twitter_api_key)
+            wrapper = TwitterAPIWrapper(settings.api.twitter_api_key)
             logger.info("TwitterTool initialized successfully")
         except TwitterAPIError:
             raise  # Re-raise TwitterAPIError as-is
         except Exception as e:
             logger.error(f"Failed to initialize TwitterTool: {str(e)}")
             raise TwitterAPIError(f"Failed to initialize TwitterTool: {str(e)}")
+
+        # Initialize Pydantic model with required fields
+        super().__init__(settings=settings, wrapper=wrapper)
 
     @classmethod
     def from_settings(cls, settings: Settings) -> "TwitterTool":
@@ -411,11 +298,11 @@ class TwitterTool(BaseTool):
                 lang=kwargs.get("lang")
             )
 
-            normalized_tweets = [
-                self.wrapper.normalize_tweet(tweet, response["users"]).dict()
-                for tweet in response["tweets"]
-                if (normalized := self.wrapper.normalize_tweet(tweet, response["users"])) is not None
-            ]
+            normalized_tweets = []
+            for tweet in response["tweets"]:
+                normalized = self.wrapper.normalize_tweet(tweet, response["users"])
+                if normalized is not None:
+                    normalized_tweets.append(normalized.dict())
 
             execution_time = time.time() - start_time
             logger.info(f"Twitter search completed: {len(normalized_tweets)} tweets found in {execution_time:.2f}s")
@@ -451,7 +338,7 @@ class TwitterTool(BaseTool):
         Returns:
             List of normalized tweet dictionaries
         """
-        start_time_log = time.time()
+        execution_start = time.time()
 
         # Log search request (masking any sensitive data)
         safe_query = query.replace('\n', ' ').replace('\r', ' ')[:100]  # Truncate and clean
@@ -463,22 +350,23 @@ class TwitterTool(BaseTool):
             loop = asyncio.get_event_loop()
             response = await loop.run_in_executor(
                 None,
-                self.wrapper.search_tweets,
-                query,
-                max_results,
-                start_time,
-                end_time,
-                lang,
-                None
+                lambda: self.wrapper.search_tweets(
+                    query=query,
+                    max_results=max_results,
+                    start_time=start_time,
+                    end_time=end_time,
+                    lang=lang,
+                    next_token=None
+                )
             )
 
-            normalized_tweets = [
-                self.wrapper.normalize_tweet(tweet, response["users"]).dict()
-                for tweet in response["tweets"]
-                if (normalized := self.wrapper.normalize_tweet(tweet, response["users"])) is not None
-            ]
+            normalized_tweets = []
+            for tweet in response["tweets"]:
+                normalized = self.wrapper.normalize_tweet(tweet, response["users"])
+                if normalized is not None:
+                    normalized_tweets.append(normalized.dict())
 
-            execution_time = time.time() - start_time_log
+            execution_time = time.time() - execution_start
             logger.info(f"Async Twitter search completed: {len(normalized_tweets)} tweets found in {execution_time:.2f}s")
 
             return normalized_tweets
@@ -486,6 +374,6 @@ class TwitterTool(BaseTool):
         except TwitterAPIError:
             raise  # Re-raise TwitterAPIError as-is
         except Exception as e:
-            execution_time = time.time() - start_time_log
+            execution_time = time.time() - execution_start
             logger.error(f"Async Twitter search failed after {execution_time:.2f}s: {str(e)}")
             raise TwitterAPIError(f"Async Twitter search failed: {str(e)}")
