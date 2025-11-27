@@ -6,7 +6,7 @@ from pydantic import PrivateAttr
 
 from langchain.tools import BaseTool
 
-from config.settings import Settings
+from config.settings import Settings, validate_api_settings
 
 
 logger = logging.getLogger(__name__)
@@ -39,29 +39,23 @@ class GoogleSearchTool(BaseTool):
     def __init__(self, settings: Settings) -> None:
         # Initialize BaseTool fields
         super().__init__(settings=settings)
-        api_key = settings.api.google_search_api_key
-        cse_id = settings.api.google_search_engine_id
-
-        if not api_key or not cse_id:
-            # Align with existing tools' behavior: log a warning and allow
-            # instantiation for testing/development; fail when _run() is used.
-            logger.warning(
-                "GoogleSearchTool instantiated without API credentials; calls to _run() will fail until credentials are set."
-            )
-            self._service = None
-            return
+        validate_api_settings(
+            settings.api, ["google_search_api_key", "google_search_engine_id"]
+        )
 
         try:
             from googleapiclient.discovery import build
-        except ImportError:  # pragma: no cover - dependency/runtime guard
-            logger.error(
-                "google-api-python-client is not installed; install with `pip install google-api-python-client`"
-            )
-            self._service = None
-            return
+        except ImportError as exc:  # pragma: no cover - dependency/runtime guard
+            raise RuntimeError(
+                "google-api-python-client is required for GoogleSearchTool; install with `pip install google-api-python-client`."
+            ) from exc
 
         # Create the service once and reuse it for subsequent calls
-        self._service = build("customsearch", "v1", developerKey=api_key)
+        self._service = build(
+            "customsearch",
+            "v1",
+            developerKey=settings.api.google_search_api_key,
+        )
 
     @classmethod
     def from_settings(cls, settings: Settings) -> "GoogleSearchTool":

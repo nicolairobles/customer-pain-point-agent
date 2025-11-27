@@ -110,10 +110,8 @@ def test_google_search_tool_limits_num_parameter(monkeypatch):
 
 
 def test_google_search_tool_raises_when_credentials_missing():
-    tool = GoogleSearchTool.from_settings(_make_settings(api_key="", cse_id=""))
-
     with pytest.raises(RuntimeError):
-        tool._run("query")
+        GoogleSearchTool.from_settings(_make_settings(api_key="", cse_id=""))
 
 
 def test_google_search_tool_wraps_http_errors(monkeypatch):
