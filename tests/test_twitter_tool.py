@@ -104,6 +104,7 @@ def test_twitter_tool_returns_normalized_results(monkeypatch, settings):
     assert tweet1["repost_count"] == 5
     assert tweet1["reply_count"] == 8
     assert tweet1["language"] == "en"
+    assert tweet1["platform"] == "twitter"
 
     # Check second tweet normalization
     tweet2 = results[1]
@@ -115,6 +116,7 @@ def test_twitter_tool_returns_normalized_results(monkeypatch, settings):
     assert tweet2["repost_count"] == 3
     assert tweet2["reply_count"] == 1
     assert tweet2["language"] == "en"
+    assert tweet2["platform"] == "twitter"
 
 
 def test_twitter_tool_handles_empty_results(monkeypatch, settings):
@@ -167,7 +169,8 @@ def test_normalized_tweet_dict_method():
         "like_count": 10,
         "repost_count": 5,
         "reply_count": 2,
-        "language": "en"
+        "language": "en",
+        "platform": "twitter"
     }
 
     assert tweet.dict() == expected
@@ -232,3 +235,231 @@ def test_twitter_tool_async_run(monkeypatch, settings):
         assert results[0]["text"] == "Async test"
 
     asyncio.run(run_test())
+
+
+def test_sanitize_text_function():
+    """Test the sanitize_text function removes URLs, emails, phones, and markdown chars."""
+    from src.tools.twitter_tool import sanitize_text
+    
+    # Test URL removal
+    assert sanitize_text("Check this link: https://example.com") == "Check this link:"
+    
+    # Test email masking
+    assert sanitize_text("Contact me at user@example.com") == "Contact me at [EMAIL]"
+    
+    # Test phone masking
+    assert sanitize_text("Call me at 123-456-7890") == "Call me at [PHONE]"
+    
+    # Test markdown unsafe chars
+    assert sanitize_text("Text with *bold* and |table|") == "Text with bold and table"
+    
+    # Test combination
+    text = "Visit https://site.com or email test@example.com, call 555-123-4567, and see *this* |table|"
+    expected = "Visit or email [EMAIL], call [PHONE], and see this table"
+    assert sanitize_text(text) == expected
+    
+    # Test empty/whitespace
+    assert sanitize_text("") == ""
+    assert sanitize_text("   ") == ""
+    assert sanitize_text(None) == ""
+
+
+def test_normalize_tweet_skips_retweets():
+    """Test that retweets are skipped during normalization."""
+    from src.tools.twitter_tool import TwitterAPIWrapper
+    
+    # Create a mock retweet
+    class MockRef:
+        type = "retweeted"
+    
+    class MockTweet:
+        id = "123"
+        text = "RT @original: Original tweet"
+        created_at = None
+        author_id = "user1"
+        public_metrics = {"like_count": 10, "retweet_count": 5, "reply_count": 2}
+        lang = "en"
+        referenced_tweets = [MockRef()]
+    
+    users = {"user1": MagicMock(username="testuser")}
+    
+    wrapper = TwitterAPIWrapper("dummy_token")
+    result = wrapper.normalize_tweet(MockTweet(), users)
+    
+    assert result is None  # Should return None for retweets
+
+
+def test_normalize_tweet_handles_missing_fields():
+    """Test normalization handles missing author, empty text, etc."""
+    from src.tools.twitter_tool import TwitterAPIWrapper
+    
+    wrapper = TwitterAPIWrapper("dummy_token")
+    
+    # Test missing author
+    class MockTweet:
+        id = "123"
+        text = "Test tweet"
+        created_at = None
+        author_id = "user1"
+        public_metrics = None
+        lang = "en"
+        referenced_tweets = None
+    
+    users = {}  # No users
+    result = wrapper.normalize_tweet(MockTweet(), users)
+    assert result is None
+    
+    # Test empty text
+    class MockTweetEmpty:
+        id = "124"
+        text = ""
+        created_at = None
+        author_id = "user1"
+        public_metrics = None
+        lang = "en"
+        referenced_tweets = None
+    
+    users = {"user1": MagicMock(username="testuser")}
+    result = wrapper.normalize_tweet(MockTweetEmpty(), users)
+    assert result is None
+    
+    # Test text that becomes empty after sanitization (only URLs)
+    class MockTweetURLs:
+        id = "125"
+        text = "https://example.com https://another.com"
+        created_at = None
+        author_id = "user1"
+        public_metrics = None
+        lang = "en"
+        referenced_tweets = None
+    
+    result = wrapper.normalize_tweet(MockTweetURLs(), users)
+    assert result is None
+
+
+def test_normalize_tweet_with_sanitization():
+    """Test that tweet text is sanitized during normalization."""
+    from src.tools.twitter_tool import TwitterAPIWrapper
+    
+    wrapper = TwitterAPIWrapper("dummy_token")
+    
+    class MockTweet:
+        id = "123"
+        text = "Check this https://example.com and email test@example.com *bold*"
+        created_at = "2024-01-15T10:30:00.000Z"
+        author_id = "user1"
+        public_metrics = {"like_count": 10, "retweet_count": 5, "reply_count": 2}
+        lang = "en"
+        referenced_tweets = None
+    
+    users = {"user1": MagicMock(username="testuser")}
+    result = wrapper.normalize_tweet(MockTweet(), users)
+    
+    assert result is not None
+    assert result.text == "Check this and email [EMAIL] bold"
+    assert result.platform == "twitter"
+
+
+def test_normalize_tweet_utc_timestamp():
+    """Test that timestamps are converted to UTC ISO format."""
+    from src.tools.twitter_tool import TwitterAPIWrapper
+    from datetime import datetime, timezone
+    
+    wrapper = TwitterAPIWrapper("dummy_token")
+    
+    # Test naive datetime (assume UTC)
+    naive_dt = datetime(2024, 1, 15, 10, 30, 0)
+    
+    class MockTweet:
+        id = "123"
+        text = "Test tweet"
+        created_at = naive_dt
+        author_id = "user1"
+        public_metrics = {"like_count": 10, "retweet_count": 5, "reply_count": 2}
+        lang = "en"
+        referenced_tweets = None
+    
+    users = {"user1": MagicMock(username="testuser")}
+    result = wrapper.normalize_tweet(MockTweet(), users)
+    
+    assert result is not None
+    assert result.created_timestamp == "2024-01-15T10:30:00+00:00"
+
+
+def test_error_handling_malformed_payload():
+    """Test that malformed payloads are handled gracefully."""
+    from src.tools.twitter_tool import TwitterAPIWrapper
+    
+    wrapper = TwitterAPIWrapper("dummy_token")
+    
+    # Test tweet with missing attributes
+    class MalformedTweet:
+        pass  # No attributes
+    
+    users = {}
+    result = wrapper.normalize_tweet(MalformedTweet(), users)
+    assert result is None
+
+
+
+def test_data_quality_schema_validation():
+    """Test that normalized payloads satisfy the interface contract."""
+    import json
+    from src.tools.twitter_tool import TwitterAPIWrapper, NormalizedTweet
+    
+    # Define expected schema
+    expected_schema = {
+        "type": "object",
+        "properties": {
+            "text": {"type": "string"},
+            "author_handle": {"type": "string"},
+            "permalink": {"type": "string"},
+            "created_timestamp": {"type": "string"},
+            "like_count": {"type": "integer"},
+            "repost_count": {"type": "integer"},
+            "reply_count": {"type": "integer"},
+            "language": {"type": "string"},
+            "platform": {"type": "string", "enum": ["twitter"]}
+        },
+        "required": ["text", "author_handle", "permalink", "created_timestamp", 
+                    "like_count", "repost_count", "reply_count", "language", "platform"]
+    }
+    
+    wrapper = TwitterAPIWrapper("dummy_token")
+    
+    class MockTweet:
+        id = "123"
+        text = "Valid tweet content"
+        created_at = "2024-01-15T10:30:00.000Z"
+        author_id = "user1"
+        public_metrics = {"like_count": 10, "retweet_count": 5, "reply_count": 2}
+        lang = "en"
+        referenced_tweets = None
+    
+    users = {"user1": MagicMock(username="testuser")}
+    result = wrapper.normalize_tweet(MockTweet(), users)
+    
+    assert result is not None
+    
+    # Convert to dict and validate against schema
+    tweet_dict = result.dict()
+    
+    # Basic validation - check all required fields exist
+    for field in expected_schema["required"]:
+        assert field in tweet_dict, f"Missing required field: {field}"
+    
+    # Check types
+    assert isinstance(tweet_dict["text"], str)
+    assert isinstance(tweet_dict["author_handle"], str)
+    assert isinstance(tweet_dict["permalink"], str)
+    assert isinstance(tweet_dict["created_timestamp"], str)
+    assert isinstance(tweet_dict["like_count"], int)
+    assert isinstance(tweet_dict["repost_count"], int)
+    assert isinstance(tweet_dict["reply_count"], int)
+    assert isinstance(tweet_dict["language"], str)
+    assert isinstance(tweet_dict["platform"], str)
+    assert tweet_dict["platform"] == "twitter"
+    
+    # Check permalink format
+    assert "twitter.com" in tweet_dict["permalink"]
+    assert tweet_dict["permalink"].endswith("/status/123")

@@ -1,10 +1,8 @@
-"""Twitter data retrieval tool for the pain point agent."""
-
-from __future__ import annotations
-
 import logging
+import re
 import time
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 import tweepy
@@ -14,6 +12,37 @@ from config.settings import Settings
 
 # Set up logging
 logger = logging.getLogger(__name__)
+
+# Regex patterns for sanitization
+_URL_RE = re.compile(r'https?://\S+')
+_EMAIL_RE = re.compile(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b')
+_PHONE_RE = re.compile(r'\b\d{3}[-.]?\d{3}[-.]?\d{4}\b')  # Simple phone regex
+_MARKDOWN_UNSAFE_RE = re.compile(r'[|*_`~]')  # Characters that might break markdown
+
+
+def sanitize_text(raw_text: str) -> str:
+    """Sanitize tweet text by removing URLs, PII, and markdown-unsafe characters."""
+    if not raw_text:
+        return ""
+    
+    text = str(raw_text)
+    
+    # Remove URLs
+    text = _URL_RE.sub('', text)
+    
+    # Remove emails
+    text = _EMAIL_RE.sub('[EMAIL]', text)  # Mask emails
+    
+    # Remove phone numbers
+    text = _PHONE_RE.sub('[PHONE]', text)  # Mask phone numbers
+    
+    # Remove markdown-unsafe characters
+    text = _MARKDOWN_UNSAFE_RE.sub('', text)
+    
+    # Collapse multiple spaces
+    text = re.sub(r'\s+', ' ', text)
+    
+    return text.strip()
 
 
 @dataclass
@@ -28,6 +57,7 @@ class NormalizedTweet:
     repost_count: int
     reply_count: int
     language: str
+    platform: str = "twitter"  # Add platform field
 
     def dict(self) -> Dict[str, Any]:
         """Convert to dictionary."""
@@ -40,6 +70,7 @@ class NormalizedTweet:
             "repost_count": self.repost_count,
             "reply_count": self.reply_count,
             "language": self.language,
+            "platform": self.platform,  # Add to dict
         }
 
 
@@ -120,7 +151,7 @@ class TwitterAPIWrapper:
                     start_time=start_dt,
                     end_time=end_dt,
                     next_token=next_token,
-                    tweet_fields=["created_at", "public_metrics", "lang", "text", "author_id"],
+                    tweet_fields=["created_at", "public_metrics", "lang", "text", "author_id", "referenced_tweets"],
                     user_fields=["username"],
                     expansions=["author_id"]
                 )
@@ -169,20 +200,56 @@ class TwitterAPIWrapper:
         # This should never be reached, but just in case
         raise TwitterAPIError("Twitter API search failed after all retry attempts")
 
-    def normalize_tweet(self, tweet: tweepy.Tweet, users: Dict[str, tweepy.User]) -> NormalizedTweet:
+    def normalize_tweet(self, tweet: tweepy.Tweet, users: Dict[str, tweepy.User]) -> Optional[NormalizedTweet]:
         """Normalize raw tweet data to our schema."""
+        # Skip retweets
+        if hasattr(tweet, 'referenced_tweets') and tweet.referenced_tweets:
+            for ref in tweet.referenced_tweets:
+                if ref.type == 'retweeted':
+                    logger.debug(f"Skipping retweet: {tweet.id}")
+                    return None
+        
+        # Skip if no text or media-only (assuming if text is empty or just URLs)
+        if not tweet.text or not tweet.text.strip():
+            logger.debug(f"Skipping media-only or empty tweet: {tweet.id}")
+            return None
+        
         author = users.get(tweet.author_id)
         author_handle = author.username if author else ""
-
+        
+        # Skip if no author
+        if not author_handle:
+            logger.debug(f"Skipping tweet with missing author: {tweet.id}")
+            return None
+        
+        sanitized_text = sanitize_text(tweet.text)
+        
+        # If after sanitization, text is empty, skip
+        if not sanitized_text:
+            logger.debug(f"Skipping tweet with no content after sanitization: {tweet.id}")
+            return None
+        
+        # Ensure timestamp is ISO 8601 UTC
+        timestamp = ""
+        if tweet.created_at:
+            # Ensure it's UTC
+            if tweet.created_at.tzinfo is None:
+                # Assume UTC if naive
+                dt = tweet.created_at.replace(tzinfo=timezone.utc)
+            else:
+                dt = tweet.created_at.astimezone(timezone.utc)
+            timestamp = dt.isoformat()
+        
         return NormalizedTweet(
-            text=tweet.text,
+            text=sanitized_text,
             author_handle=author_handle,
             permalink=f"https://twitter.com/{author_handle}/status/{tweet.id}",
-            created_timestamp=tweet.created_at.isoformat() if tweet.created_at else "",
+            created_timestamp=timestamp,
             like_count=tweet.public_metrics.get("like_count", 0) if tweet.public_metrics else 0,
             repost_count=tweet.public_metrics.get("retweet_count", 0) if tweet.public_metrics else 0,
             reply_count=tweet.public_metrics.get("reply_count", 0) if tweet.public_metrics else 0,
-            language=tweet.lang or ""
+            language=tweet.lang or "",
+            platform="twitter"
         )
 
     def search_tweets(
@@ -228,7 +295,7 @@ class TwitterAPIWrapper:
             start_time=start_dt,
             end_time=end_dt,
             next_token=next_token,
-            tweet_fields=["created_at", "public_metrics", "lang", "text", "author_id"],
+            tweet_fields=["created_at", "public_metrics", "lang", "text", "author_id", "referenced_tweets"],
             user_fields=["username"],
             expansions=["author_id"]
         )
@@ -246,20 +313,56 @@ class TwitterAPIWrapper:
             "next_token": response.meta.get("next_token") if response.meta else None
         }
 
-    def normalize_tweet(self, tweet: tweepy.Tweet, users: Dict[str, tweepy.User]) -> NormalizedTweet:
+    def normalize_tweet(self, tweet: tweepy.Tweet, users: Dict[str, tweepy.User]) -> Optional[NormalizedTweet]:
         """Normalize raw tweet data to our schema."""
+        # Skip retweets
+        if hasattr(tweet, 'referenced_tweets') and tweet.referenced_tweets:
+            for ref in tweet.referenced_tweets:
+                if ref.type == 'retweeted':
+                    logger.debug(f"Skipping retweet: {tweet.id}")
+                    return None
+        
+        # Skip if no text or media-only (assuming if text is empty or just URLs)
+        if not tweet.text or not tweet.text.strip():
+            logger.debug(f"Skipping media-only or empty tweet: {tweet.id}")
+            return None
+        
         author = users.get(tweet.author_id)
         author_handle = author.username if author else ""
-
+        
+        # Skip if no author
+        if not author_handle:
+            logger.debug(f"Skipping tweet with missing author: {tweet.id}")
+            return None
+        
+        sanitized_text = sanitize_text(tweet.text)
+        
+        # If after sanitization, text is empty, skip
+        if not sanitized_text:
+            logger.debug(f"Skipping tweet with no content after sanitization: {tweet.id}")
+            return None
+        
+        # Ensure timestamp is ISO 8601 UTC
+        timestamp = ""
+        if tweet.created_at:
+            # Ensure it's UTC
+            if tweet.created_at.tzinfo is None:
+                # Assume UTC if naive
+                dt = tweet.created_at.replace(tzinfo=timezone.utc)
+            else:
+                dt = tweet.created_at.astimezone(timezone.utc)
+            timestamp = dt.isoformat()
+        
         return NormalizedTweet(
-            text=tweet.text,
+            text=sanitized_text,
             author_handle=author_handle,
             permalink=f"https://twitter.com/{author_handle}/status/{tweet.id}",
-            created_timestamp=tweet.created_at.isoformat() if tweet.created_at else "",
+            created_timestamp=timestamp,
             like_count=tweet.public_metrics.get("like_count", 0) if tweet.public_metrics else 0,
             repost_count=tweet.public_metrics.get("retweet_count", 0) if tweet.public_metrics else 0,
             reply_count=tweet.public_metrics.get("reply_count", 0) if tweet.public_metrics else 0,
-            language=tweet.lang or ""
+            language=tweet.lang or "",
+            platform="twitter"
         )
 
 
@@ -311,6 +414,7 @@ class TwitterTool(BaseTool):
             normalized_tweets = [
                 self.wrapper.normalize_tweet(tweet, response["users"]).dict()
                 for tweet in response["tweets"]
+                if (normalized := self.wrapper.normalize_tweet(tweet, response["users"])) is not None
             ]
 
             execution_time = time.time() - start_time
@@ -371,6 +475,7 @@ class TwitterTool(BaseTool):
             normalized_tweets = [
                 self.wrapper.normalize_tweet(tweet, response["users"]).dict()
                 for tweet in response["tweets"]
+                if (normalized := self.wrapper.normalize_tweet(tweet, response["users"])) is not None
             ]
 
             execution_time = time.time() - start_time_log
