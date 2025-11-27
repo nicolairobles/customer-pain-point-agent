@@ -1,0 +1,41 @@
+{
+  "query": "site:reddit.com customer pain points",
+  "count": 5,
+  "items": [
+    {
+      "title": "How do you Discover customer pain points and Unmet needs in ...",
+      "link": "https://www.reddit.com/r/SaaS/comments/10nt836/how_do_you_discover_customer_pain_points_and/",
+      "snippet": "Jan 28, 2023 ... First, establish a relationship with your potential customers. Address them sincerely, letting them know that you want to build something to help them.",
+      "display_link": "www.reddit.com",
+      "cache_id": "sampleCacheId1"
+    },
+    {
+      "title": "I wish there was a website that just had a list of customer pain points ...",
+      "link": "https://www.reddit.com/r/SaaS/comments/17hfimf/i_wish_there_was_a_website_that_just_had_a_list/",
+      "snippet": "Oct 27, 2023 ... I wish there was a website that just listed different real customer pain points by industry.",
+      "display_link": "www.reddit.com",
+      "cache_id": "sampleCacheId2"
+    },
+    {
+      "title": "Solving pain points vs Bringing value to customers : r ...",
+      "link": "https://www.reddit.com/r/ProductManagement/comments/t6ml7v/solving_pain_points_vs_bringing_value_to_customers/",
+      "snippet": "Mar 4, 2022 ... In terms of prioritization, I personally focus on pain points, because, unlike 'bringing value', a PAIN POINT can fester, rot, and corrode ...",
+      "display_link": "www.reddit.com",
+      "cache_id": "sampleCacheId3"
+    },
+    {
+      "title": "What are the pain points for customers POV in the fashion industry ...",
+      "link": "https://www.reddit.com/r/fashionwomens35/comments/y0rncu/what_are_the_pain_points_for_customers_pov_in_the/",
+      "snippet": "Oct 10, 2022 ... Lack of natural fibers from retailers (cotton, wool, linen, etc). Stuff that's too trendy. Lack of pockets on dresses (we always want pockets).",
+      "display_link": "www.reddit.com",
+      "cache_id": "sampleCacheId4"
+    },
+    {
+      "title": "What exactly are pain points? : r/copywriting",
+      "link": "https://www.reddit.com/r/copywriting/comments/w72if9/what_exactly_are_pain_points/",
+      "snippet": "Jul 24, 2022 ... It says on google that pain points are specific problems faced by current or prospective customers in the marketplace.",
+      "display_link": "www.reddit.com",
+      "cache_id": "sampleCacheId5"
+    }
+  ]
+}

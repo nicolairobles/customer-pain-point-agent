@@ -18,3 +18,10 @@
 1. Create an API key via the [Google Cloud Console](https://console.cloud.google.com/).
 2. Configure a Custom Search Engine and capture its ID.
 3. Populate `GOOGLE_SEARCH_API_KEY` and `GOOGLE_SEARCH_ENGINE_ID` in the `.env` file.
+
+### Quotas and Cost Notes
+
+- Google Custom Search enforces quotas and may require billing for higher usage. Check `APIs & Services -> Quotas` in your Cloud Console for exact per-minute and daily limits for your project.
+- For development and smoke tests: keep requests small (`num <= 10`) and add local caching to avoid repeated queries.
+- Restrict API keys to the Custom Search API and, if possible, to specific IPs or referrers to reduce risk of abuse.
+

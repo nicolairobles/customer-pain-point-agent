@@ -24,6 +24,16 @@ pip install -r requirements.txt
 
 ### Environment Variables
 Copy `.env.example` to `.env` and populate the required API keys.
+Example entries (do not commit real keys):
+
+```
+REDDIT_CLIENT_ID=your_reddit_client_id
+REDDIT_CLIENT_SECRET=your_reddit_client_secret
+REDDIT_USER_AGENT=your_user_agent
+OPENAI_API_KEY=your_openai_api_key
+```
+
+For Google Custom Search, you can follow `issues/generated/2.2.1_configure-google-custom-search.md` for setup steps. A small smoke-test script is provided at `scripts/test_google_search.py` — run it locally after setting `GOOGLE_SEARCH_API_KEY` and `GOOGLE_SEARCH_ENGINE_ID` in your `.env`.
 
 ### Running the App
 ```bash
