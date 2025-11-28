@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+import asyncio
 import logging
 import re
 import time
@@ -6,6 +9,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 import tweepy
+from pydantic import PrivateAttr
 from langchain.tools import BaseTool
 
 from config.settings import Settings
@@ -16,7 +20,7 @@ logger = logging.getLogger(__name__)
 # Regex patterns for sanitization
 _URL_RE = re.compile(r'https?://\S+')
 _EMAIL_RE = re.compile(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b')
-_PHONE_RE = re.compile(r'\b\d{3}[-.]?\d{3}[-.]?\d{4}\b')  # Simple phone regex
+_PHONE_RE = re.compile(r'\b\+?[\d\-\(\)]{7,15}\b')  # International phone number pattern
 _MARKDOWN_UNSAFE_RE = re.compile(r'[|*_`~]')  # Characters that might break markdown
 
 
@@ -91,9 +95,9 @@ class TwitterAPIWrapper:
             # Test the connection with a minimal request
             self.client.get_me()
             logger.info("Twitter API authentication successful")
-        except tweepy.Unauthorized as e:
+        except tweepy.Unauthorized:
             raise TwitterAPIError("Twitter API authentication failed: Invalid bearer token. Please check your TWITTER_API_KEY.")
-        except tweepy.Forbidden as e:
+        except tweepy.Forbidden:
             raise TwitterAPIError("Twitter API authentication failed: Access forbidden. Your bearer token may not have the required permissions.")
         except tweepy.TweepyException as e:
             raise TwitterAPIError(f"Twitter API authentication failed: {str(e)}")
@@ -180,15 +184,14 @@ class TwitterAPIWrapper:
                     logger.error(f"Twitter API rate limit exceeded after {max_retries + 1} attempts")
                     raise TwitterAPIError(f"Twitter API rate limit exceeded after {max_retries + 1} attempts. Please try again later.")
 
+            except tweepy.BadRequest as e:
+                raise TwitterAPIError(f"Invalid search query: {query}. Please check your query syntax.")
+            except tweepy.Unauthorized as e:
+                raise TwitterAPIError("Twitter API authentication failed during search. Token may be invalid.")
             except tweepy.TweepyException as e:
                 error_msg = f"Twitter API error: {str(e)}"
                 logger.error(error_msg)
-                if "400" in str(e):
-                    raise TwitterAPIError(f"Invalid search query: {query}. Please check your query syntax.")
-                elif "401" in str(e):
-                    raise TwitterAPIError("Twitter API authentication failed during search. Token may be invalid.")
-                else:
-                    raise TwitterAPIError(error_msg)
+                raise TwitterAPIError(error_msg)
 
             except Exception as e:
                 error_msg = f"Unexpected error during Twitter API search: {str(e)}"
@@ -257,7 +260,7 @@ class TwitterTool(BaseTool):
     name: str = "twitter_search"
     description: str = "Search Twitter for discussions related to customer pain points. Supports hashtags, keywords, language filters, and time windows."
     settings: Any
-    wrapper: TwitterAPIWrapper
+    _wrapper: TwitterAPIWrapper = PrivateAttr(default=None)
 
     def __init__(self, settings: Settings) -> None:
         # Validate settings has Twitter API key
@@ -274,7 +277,8 @@ class TwitterTool(BaseTool):
             raise TwitterAPIError(f"Failed to initialize TwitterTool: {str(e)}")
 
         # Initialize Pydantic model with required fields
-        super().__init__(settings=settings, wrapper=wrapper)
+        super().__init__(settings=settings)
+        self._wrapper = wrapper
 
     @classmethod
     def from_settings(cls, settings: Settings) -> "TwitterTool":
@@ -290,7 +294,7 @@ class TwitterTool(BaseTool):
         logger.info(f"Twitter search initiated: query='{safe_query}'..., filters={kwargs}")
 
         try:
-            response = self.wrapper.search_tweets(
+            response = self._wrapper.search_tweets(
                 query=query,
                 max_results=kwargs.get("max_results", 15),  # Default to 15 tweets
                 start_time=kwargs.get("start_time"),
@@ -300,7 +304,7 @@ class TwitterTool(BaseTool):
 
             normalized_tweets = []
             for tweet in response["tweets"]:
-                normalized = self.wrapper.normalize_tweet(tweet, response["users"])
+                normalized = self._wrapper.normalize_tweet(tweet, response["users"])
                 if normalized is not None:
                     normalized_tweets.append(normalized.dict())
 
@@ -346,11 +350,10 @@ class TwitterTool(BaseTool):
 
         try:
             # For simplicity, since tweepy is sync, run in thread
-            import asyncio
             loop = asyncio.get_event_loop()
             response = await loop.run_in_executor(
                 None,
-                lambda: self.wrapper.search_tweets(
+                lambda: self._wrapper.search_tweets(
                     query=query,
                     max_results=max_results,
                     start_time=start_time,
@@ -362,7 +365,7 @@ class TwitterTool(BaseTool):
 
             normalized_tweets = []
             for tweet in response["tweets"]:
-                normalized = self.wrapper.normalize_tweet(tweet, response["users"])
+                normalized = self._wrapper.normalize_tweet(tweet, response["users"])
                 if normalized is not None:
                     normalized_tweets.append(normalized.dict())
 

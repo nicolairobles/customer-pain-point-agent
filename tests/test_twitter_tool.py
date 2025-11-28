@@ -315,32 +315,32 @@ def test_normalize_tweet_handles_missing_fields():
         result = wrapper.normalize_tweet(MockTweet(), users)
         assert result is None
     
-    # Test empty text
-    class MockTweetEmpty:
-        id = "124"
-        text = ""
-        created_at = None
-        author_id = "user1"
-        public_metrics = None
-        lang = "en"
-        referenced_tweets = None
+        # Test empty text
+        class MockTweetEmpty:
+            id = "124"
+            text = ""
+            created_at = None
+            author_id = "user1"
+            public_metrics = None
+            lang = "en"
+            referenced_tweets = None
     
-    users = {"user1": MagicMock(username="testuser")}
-    result = wrapper.normalize_tweet(MockTweetEmpty(), users)
-    assert result is None
+        users = {"user1": MagicMock(username="testuser")}
+        result = wrapper.normalize_tweet(MockTweetEmpty(), users)
+        assert result is None
     
-    # Test text that becomes empty after sanitization (only URLs)
-    class MockTweetURLs:
-        id = "125"
-        text = "https://example.com https://another.com"
-        created_at = None
-        author_id = "user1"
-        public_metrics = None
-        lang = "en"
-        referenced_tweets = None
+        # Test text that becomes empty after sanitization (only URLs)
+        class MockTweetURLs:
+            id = "125"
+            text = "https://example.com https://another.com"
+            created_at = None
+            author_id = "user1"
+            public_metrics = None
+            lang = "en"
+            referenced_tweets = None
     
-    result = wrapper.normalize_tweet(MockTweetURLs(), users)
-    assert result is None
+        result = wrapper.normalize_tweet(MockTweetURLs(), users)
+        assert result is None
 
 
 @patch('src.tools.twitter_tool.tweepy.Client')
@@ -534,6 +534,8 @@ def test_twitter_api_rate_limit_retry_logic(monkeypatch, settings, caplog):
     
     with caplog.at_level(logging.WARNING):
         result = wrapper.search_tweets("test query", max_retries=3)
+        # Assert that the result is as expected (empty list, since mock returns data=[])
+        assert result == {"tweets": [], "users": {}, "next_token": None}
     
     # Check that retry warnings were logged
     assert "Twitter API rate limit exceeded. Retrying in" in caplog.text
