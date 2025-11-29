@@ -12,10 +12,3 @@ def test_deduplicate_pain_points_returns_list() -> None:
 
     mock_points = []
     assert pain_point_extractor.deduplicate_pain_points(mock_points) == mock_points
-
-
-def test_extract_pain_points_not_implemented() -> None:
-    """Placeholder ensuring extraction raises until implemented."""
-
-    with pytest.raises(NotImplementedError):
-        pain_point_extractor.extract_pain_points([])

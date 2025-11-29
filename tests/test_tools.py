@@ -5,8 +5,11 @@ from __future__ import annotations
 import os
 import pytest
 from unittest.mock import Mock
+from typing import List, Dict, Any
+from pydantic import BaseModel, field_validator
 
 from config.settings import settings
+from src.tools.google_parser import normalize_google_result, sanitize_text, parse_google_date, extract_publication_date
 from src.tools.google_search_tool import GoogleSearchTool
 from src.tools.reddit_tool import RedditTool
 from src.tools.twitter_tool import TwitterTool
@@ -124,14 +127,14 @@ def test_google_search_tool_normalization() -> None:
         
         assert len(results) == 2
         assert results[0]["title"] == "Test Result 1"
-        assert results[0]["snippet"] == "This is a test snippet"
+        assert results[0]["text"] == "This is a test snippet"
         assert results[0]["url"] == "https://example.com/1"
         assert results[0]["display_url"] == "example.com"
-        assert results[0]["published_date"] == "2023-01-01"
+        assert results[0]["created_at"] == "2023-01-01"
         assert results[0]["ranking_position"] == 1
         
         assert results[1]["ranking_position"] == 2
-        assert results[1]["published_date"] == ""  # No date available
+        assert results[1]["created_at"] == ""  # No date available
 
 
 def test_google_search_tool_zero_results() -> None:
@@ -303,3 +306,221 @@ def test_google_search_tool_performance() -> None:
     print(f"Mean latency: {statistics.mean(durations):.2f}s")
     print(f"95th percentile: {percentile_95:.2f}s")
     print(f"Min/Max: {min(durations):.2f}s / {max(durations):.2f}s")
+
+
+class GoogleDocumentModel(BaseModel):
+    """Schema to validate normalized Google search result payloads."""
+
+    id: str
+    title: str
+    text: str
+    author: str
+    subreddit: str
+    permalink: str
+    url: str
+    display_url: str
+    created_at: str
+    upvotes: int
+    comments: int
+    content_flags: List[str]
+    platform: str
+    ranking_position: int
+    search_metadata: Dict[str, Any]
+
+    @field_validator("created_at")
+    @classmethod
+    def validate_created_at(cls, value: str) -> str:
+        # Allow empty string for missing dates, otherwise expect ISO format
+        if value == "":
+            return value
+        # Should be ISO format (may or may not have timezone)
+        from datetime import datetime
+        try:
+            datetime.fromisoformat(value.replace('Z', '+00:00'))
+            return value
+        except ValueError:
+            raise ValueError(f"Invalid ISO format: {value}")
+
+
+def test_google_parser_sanitize_text() -> None:
+    """Test HTML sanitization in Google parser."""
+    # Basic HTML stripping
+    assert sanitize_text("<b>Bold text</b>") == "Bold text"
+    assert sanitize_text("Normal text") == "Normal text"
+    
+    # HTML entities
+    assert sanitize_text("Price: &pound;10 &amp; &lt;more&gt;") == "Price: £10 & <more>"
+    
+    # Multiple whitespace
+    assert sanitize_text("Text   with    spaces") == "Text with spaces"
+    
+    # Empty/None handling
+    assert sanitize_text("") == ""
+    assert sanitize_text(None) == ""
+
+
+def test_google_parser_parse_date() -> None:
+    """Test date parsing for various Google date formats."""
+    # ISO format (should pass through)
+    assert parse_google_date("2023-01-01") == "2023-01-01"
+    assert parse_google_date("2023-01-01T12:00:00Z") == "2023-01-01T12:00:00Z"
+    
+    # Common formats
+    assert parse_google_date("Jan 1, 2023").startswith("2023-01-01")
+    assert parse_google_date("January 15, 2023").startswith("2023-01-15")
+    
+    # Unix timestamp
+    result = parse_google_date("1672531200")  # 2023-01-01 00:00:00 UTC
+    assert result.startswith("2023-01-01")
+    
+    # Invalid dates
+    assert parse_google_date("") == ""
+    assert parse_google_date("invalid") == ""
+    assert parse_google_date(None) == ""
+
+
+def test_google_parser_extract_publication_date() -> None:
+    """Test extraction of publication dates from Google result items."""
+    # Test with article:published_time
+    item_with_published = {
+        "pagemap": {
+            "metatags": [{"article:published_time": "2023-01-01"}]
+        }
+    }
+    assert extract_publication_date(item_with_published).startswith("2023-01-01")
+    
+    # Test with date field
+    item_with_date = {
+        "pagemap": {
+            "metatags": [{"date": "Jan 15, 2023"}]
+        }
+    }
+    assert extract_publication_date(item_with_date).startswith("2023-01-15")
+    
+    # Test with no date
+    item_no_date = {"pagemap": {"metatags": [{}]}}
+    assert extract_publication_date(item_no_date) == ""
+    
+    # Test with no pagemap
+    item_no_pagemap = {}
+    assert extract_publication_date(item_no_pagemap) == ""
+
+
+def test_google_parser_normalize_standard_result() -> None:
+    """Test normalization of standard Google search result."""
+    item = {
+        "title": "<b>Sample</b> Title &amp; More",
+        "snippet": "This is a <em>sample</em> snippet with   extra   spaces",
+        "link": "https://example.com/page",
+        "displayLink": "example.com",
+        "cacheId": "abc123",
+        "pagemap": {
+            "metatags": [{"article:published_time": "2023-01-01"}]
+        }
+    }
+    
+    result = normalize_google_result(item, 1)
+    
+    assert result is not None
+    assert result["id"] == "abc123"
+    assert result["title"] == "Sample Title & More"
+    assert result["text"] == "This is a sample snippet with extra spaces"
+    assert result["url"] == "https://example.com/page"
+    assert result["display_url"] == "example.com"
+    assert result["created_at"].startswith("2023-01-01")
+    assert result["platform"] == "google_search"
+    assert result["ranking_position"] == 1
+    assert "search_metadata" in result
+
+
+def test_google_parser_normalize_news_result() -> None:
+    """Test normalization of news result with different date format."""
+    item = {
+        "title": "Breaking News Story",
+        "snippet": "Important news content here",
+        "link": "https://news.example.com/story",
+        "displayLink": "news.example.com",
+        "pagemap": {
+            "metatags": [{"date": "Jan 15, 2023"}]
+        }
+    }
+    
+    result = normalize_google_result(item, 2)
+    
+    assert result is not None
+    assert result["title"] == "Breaking News Story"
+    assert result["created_at"].startswith("2023-01-15")
+    assert result["ranking_position"] == 2
+
+
+def test_google_parser_normalize_missing_fields() -> None:
+    """Test normalization when optional fields are missing."""
+    item = {
+        "title": "Minimal Result",
+        "link": "https://example.com"
+    }
+    
+    result = normalize_google_result(item, 3)
+    
+    assert result is not None
+    assert result["title"] == "Minimal Result"
+    assert result["text"] == ""  # Missing snippet
+    assert result["display_url"] == ""  # Missing displayLink
+    assert result["created_at"] == ""  # No date info
+    assert result["ranking_position"] == 3
+
+
+def test_google_parser_skip_non_web_results() -> None:
+    """Test that non-web results are skipped."""
+    # Image result
+    image_item = {
+        "kind": "customsearch#result",
+        "title": "Sample Image",
+        "link": "https://example.com/image.jpg"
+    }
+    
+    result = normalize_google_result(image_item, 1)
+    assert result is None  # Should be filtered out
+
+
+def test_google_parser_malformed_payload() -> None:
+    """Test handling of malformed or unexpected payload structures."""
+    # Completely empty item
+    result = normalize_google_result({}, 1)
+    assert result is not None
+    assert result["title"] == ""
+    assert result["text"] == ""
+    
+    # Malformed pagemap
+    malformed_item = {
+        "title": "Test",
+        "pagemap": "not_a_dict"
+    }
+    result = normalize_google_result(malformed_item, 1)
+    assert result is not None
+    assert result["created_at"] == ""  # Should handle gracefully
+
+
+def test_google_parser_normalize_validates_against_schema():
+    """Test that normalized Google results validate against the document schema."""
+    item = {
+        "title": "Sample Title",
+        "snippet": "Sample snippet text",
+        "link": "https://example.com",
+        "displayLink": "example.com",
+        "cacheId": "abc123",
+        "pagemap": {
+            "metatags": [{"article:published_time": "2023-01-01T12:00:00Z"}]
+        }
+    }
+    
+    result = normalize_google_result(item, 1)
+    assert result is not None
+    
+    # Validate against Pydantic model
+    doc = GoogleDocumentModel(**result)
+    assert doc.id == "abc123"
+    assert doc.title == "Sample Title"
+    assert doc.platform == "google_search"
+    assert doc.ranking_position == 1
+    assert isinstance(doc.search_metadata, dict)

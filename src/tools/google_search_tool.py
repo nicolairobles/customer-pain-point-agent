@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Optional
 
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
@@ -12,6 +12,7 @@ from langchain.tools import BaseTool
 from pydantic import PrivateAttr
 
 from config.settings import Settings
+from src.tools.google_parser import normalize_google_result
 
 _LOG = logging.getLogger(__name__)
 
@@ -45,17 +46,9 @@ class GoogleSearchTool(BaseTool):
 
         return cls(settings)
 
-    def _normalize_result(self, item: Dict[str, Any], position: int) -> Dict[str, Any]:
-        """Normalize a Google Custom Search result to standard format."""
-        return {
-            "title": item.get("title", ""),
-            "snippet": item.get("snippet", ""),
-            "url": item.get("link", ""),
-            "display_url": item.get("displayLink", ""),
-            "published_date": item.get("pagemap", {}).get("metatags", [{}])[0].get("article:published_time") or 
-                           item.get("pagemap", {}).get("metatags", [{}])[0].get("date") or "",
-            "ranking_position": position,
-        }
+    def _normalize_result(self, item: Dict[str, Any], position: int) -> Optional[Dict[str, Any]]:
+        """Normalize a Google Custom Search result using the dedicated parser."""
+        return normalize_google_result(item, position)
 
     def _run(self, query: str, *args: Any, **kwargs: Any) -> List[Dict[str, Any]]:
         """Synchronously execute the tool and return search results.
@@ -97,6 +90,8 @@ class GoogleSearchTool(BaseTool):
                     self._normalize_result(item, i + 1) 
                     for i, item in enumerate(items)
                 ]
+                # Filter out None results (non-web results that were skipped)
+                normalized_results = [r for r in normalized_results if r is not None]
                 
                 duration = time.time() - start_time
                 _LOG.info(

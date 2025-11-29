@@ -33,6 +33,7 @@ class PainPoint(BaseModel):
     examples: List[str]
     sources: List[PainPointSource]
     sentiment: str = Field(default="neutral", pattern=r"^(positive|neutral|negative)$")
+    relevance: float = Field(default=0.0, ge=0.0, le=1.0)
 
 
 # ---------------------------------------------------------------------------
@@ -125,8 +126,12 @@ def _post_process(point: PainPoint) -> PainPoint:
 
     unique_sources = {(src.platform.lower(), src.author.lower(), src.url) for src in point.sources}
     frequency = _calculate_frequency_tag(len(unique_sources))
+    
+    # Create updated point with computed frequency for relevance calculation
+    updated_point = point.model_copy(update={"frequency": frequency})
+    relevance = _calculate_relevance_score(updated_point)
 
-    return point.model_copy(update={"sentiment": sentiment, "frequency": frequency})
+    return updated_point.model_copy(update={"sentiment": sentiment, "relevance": relevance})
 
 
 def _chunk(iterable: Sequence[Mapping[str, Any]], size: int) -> Iterator[Sequence[Mapping[str, Any]]]:
@@ -151,6 +156,24 @@ def _calculate_frequency_tag(source_count: int) -> str:
     if source_count == 2:
         return "medium"
     return "low"
+
+
+def _calculate_relevance_score(point: PainPoint) -> float:
+    """Calculate a relevance score based on source diversity, recency, and frequency."""
+    
+    # Base score from number of sources (0.0 to 0.4)
+    source_count = len(point.sources)
+    source_score = min(source_count / 10.0, 0.4)  # Cap at 10 sources for max score
+    
+    # Platform diversity bonus (0.0 to 0.3)
+    platforms = {src.platform.lower() for src in point.sources}
+    platform_score = min(len(platforms) / 3.0, 0.3)  # Max score for 3+ platforms
+    
+    # Frequency bonus (0.0 to 0.3)
+    frequency_multipliers = {"low": 0.1, "medium": 0.2, "high": 0.3}
+    frequency_score = frequency_multipliers.get(point.frequency, 0.0)
+    
+    return min(source_score + platform_score + frequency_score, 1.0)
 
 
 _NEGATIVE_TOKENS = {"error", "fail", "issue", "bug", "hate", "angry", "frustrated"}

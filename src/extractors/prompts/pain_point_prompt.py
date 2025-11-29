@@ -69,7 +69,8 @@ class PainPointPrompt:
           "timestamp": "ISO-8601 string",
           "author": "string"
         }
-      ]
+      ],
+      "relevance": 0.0
     }
   ],
   "analysis_notes": {
