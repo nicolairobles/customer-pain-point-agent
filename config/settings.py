@@ -23,6 +23,13 @@ class APISettings:
     google_search_api_key: str = os.getenv("GOOGLE_SEARCH_API_KEY", "")
     google_search_engine_id: str = os.getenv("GOOGLE_SEARCH_ENGINE_ID", "")
 
+    def __post_init__(self) -> None:
+        """Validate that required API credentials are provided."""
+        if not self.google_search_api_key:
+            raise ValueError("GOOGLE_SEARCH_API_KEY must be set in environment variables")
+        if not self.google_search_engine_id:
+            raise ValueError("GOOGLE_SEARCH_ENGINE_ID must be set in environment variables")
+
 
 @dataclass(frozen=True)
 class AgentSettings:
