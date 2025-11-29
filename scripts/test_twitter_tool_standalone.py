@@ -2,6 +2,9 @@
 """
 Standalone Twitter Tool Test (No LangChain Dependencies)
 Tests core functionality without LangChain integration.
+
+Note: Classes are duplicated here to avoid import dependencies and allow
+testing of core logic independently of the main implementation.
 """
 
 import sys
@@ -46,15 +49,15 @@ class TwitterAPIError(Exception):
     pass
 
 class TwitterAPIWrapper:
-    """Wrapper for Twitter API operations."""
+    """Wrapper for Twitter API operations with basic validation."""
 
     def __init__(self, api_key: str):
         """Initialize with API key validation."""
         if not api_key or not isinstance(api_key, str) or api_key.strip() == '':
-            raise TwitterAPIError("Twitter API key is missing or empty. Please set TWITTER_API_KEY environment variable.")
+            raise TwitterAPIError("Twitter API bearer token is missing or empty. Please set TWITTER_API_KEY in your environment variables.")
 
         self.api_key = api_key.strip()
-        # Validate key format (basic check)
+        # Basic validation (standalone version - main implementation does full auth)
         if len(self.api_key) < 10:
             raise TwitterAPIError("Twitter API key appears to be invalid (too short). Please check your TWITTER_API_KEY.")
 

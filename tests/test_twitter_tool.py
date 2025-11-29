@@ -6,6 +6,14 @@ import tweepy
 from src.tools.twitter_tool import TwitterTool, TwitterAPIWrapper, NormalizedTweet
 
 
+def _parse_datetime(created_at):
+    """Helper function to parse datetime from string or return as-is."""
+    from datetime import datetime, timezone
+    if isinstance(created_at, str):
+        return datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+    return created_at
+
+
 class DummyTweet:
     def __init__(
         self,
@@ -19,11 +27,7 @@ class DummyTweet:
         self.id = id
         self.text = text
         # Convert ISO string to datetime object
-        from datetime import datetime, timezone
-        if isinstance(created_at, str):
-            self.created_at = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
-        else:
-            self.created_at = created_at
+        self.created_at = _parse_datetime(created_at)
         self.author_id = author_id
         self.public_metrics = public_metrics or {
             "like_count": 10,
@@ -212,6 +216,8 @@ def test_twitter_tool_with_query_parameters(monkeypatch, settings):
 
 def test_twitter_tool_async_run(monkeypatch, settings):
     """Test the async _arun method."""
+    # Note: This test verifies the async method returns correct results but doesn't test
+    # true async behavior (concurrency, thread pool usage, etc.) due to mocking complexity
     import asyncio
 
     tweets = [DummyTweet("123", "Async test", "2024-01-15T10:30:00.000Z", "user1")]
@@ -253,6 +259,21 @@ def test_sanitize_text_function():
     text = "Visit https://site.com or email test@example.com, call 555-123-4567, and see *this* |table|"
     expected = "Visit or email [EMAIL], call [PHONE], and see this table"
     assert sanitize_text(text) == expected
+    
+    # Test edge cases
+    # Very long string
+    long_text = "A" * 10000 + " https://example.com " + "B" * 10000
+    result = sanitize_text(long_text)
+    assert len(result) < len(long_text)  # Should be shorter due to URL removal
+    assert "https://example.com" not in result
+    
+    # String that becomes only whitespace after sanitization
+    whitespace_only = "   https://example.com   "
+    assert sanitize_text(whitespace_only) == ""
+    
+    # Mixed newlines and carriage returns (gets collapsed to single spaces)
+    multiline = "Line 1\nLine 2\r\nLine 3"
+    assert sanitize_text(multiline) == "Line 1 Line 2 Line 3"
     
     # Test empty/whitespace
     assert sanitize_text("") == ""
@@ -314,7 +335,7 @@ def test_normalize_tweet_handles_missing_fields():
         users = {}  # No users
         result = wrapper.normalize_tweet(MockTweet(), users)
         assert result is None
-    
+
         # Test empty text
         class MockTweetEmpty:
             id = "124"
@@ -324,11 +345,11 @@ def test_normalize_tweet_handles_missing_fields():
             public_metrics = None
             lang = "en"
             referenced_tweets = None
-    
+
         users = {"user1": MagicMock(username="testuser")}
         result = wrapper.normalize_tweet(MockTweetEmpty(), users)
         assert result is None
-    
+
         # Test text that becomes empty after sanitization (only URLs)
         class MockTweetURLs:
             id = "125"
@@ -338,7 +359,7 @@ def test_normalize_tweet_handles_missing_fields():
             public_metrics = None
             lang = "en"
             referenced_tweets = None
-    
+
         result = wrapper.normalize_tweet(MockTweetURLs(), users)
         assert result is None
 
@@ -358,8 +379,7 @@ def test_normalize_tweet_with_sanitization(mock_client_class):
             self.id = "123"
             self.text = "Check this https://example.com and email test@example.com *bold*"
             # Convert ISO string to datetime object
-            from datetime import datetime
-            self.created_at = datetime.fromisoformat("2024-01-15T10:30:00.000Z".replace('Z', '+00:00'))
+            self.created_at = _parse_datetime("2024-01-15T10:30:00.000Z")
             self.author_id = "user1"
             self.public_metrics = {"like_count": 10, "retweet_count": 5, "reply_count": 2}
             self.lang = "en"
@@ -457,7 +477,7 @@ def test_data_quality_schema_validation(mock_client_class):
             self.text = "Valid tweet content"
             # Convert ISO string to datetime object
             from datetime import datetime
-            self.created_at = datetime.fromisoformat("2024-01-15T10:30:00.000Z".replace('Z', '+00:00'))
+            self.created_at = _parse_datetime("2024-01-15T10:30:00.000Z")
             self.author_id = "user1"
             self.public_metrics = {"like_count": 10, "retweet_count": 5, "reply_count": 2}
             self.lang = "en"

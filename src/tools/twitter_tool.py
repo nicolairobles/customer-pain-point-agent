@@ -15,12 +15,14 @@ from langchain.tools import BaseTool
 from config.settings import Settings
 
 # Set up logging
-logger = logging.getLogger(__name__)
+_LOG = logging.getLogger(__name__)
 
 # Regex patterns for sanitization
 _URL_RE = re.compile(r'https?://\S+')
 _EMAIL_RE = re.compile(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b')
-_PHONE_RE = re.compile(r'\b\+?[\d\-\(\)]{7,15}\b')  # International phone number pattern
+_PHONE_RE = re.compile(
+    r'\b(?:\+?\d{1,3}[\s\-\.]?)?(?:\(?\d{3}\)?[\s\-\.]?)?\d{3}[\s\-\.]?\d{4}\b'
+)  # Improved phone number pattern: matches common formats, avoids dates
 _MARKDOWN_UNSAFE_RE = re.compile(r'[|*_`~]')  # Characters that might break markdown
 
 
@@ -94,7 +96,7 @@ class TwitterAPIWrapper:
             self.client = tweepy.Client(bearer_token=bearer_token.strip())
             # Test the connection with a minimal request
             self.client.get_me()
-            logger.info("Twitter API authentication successful")
+            _LOG.info("Twitter API authentication successful")
         except tweepy.Unauthorized:
             raise TwitterAPIError("Twitter API authentication failed: Invalid bearer token. Please check your TWITTER_API_KEY.")
         except tweepy.Forbidden:
@@ -142,10 +144,10 @@ class TwitterAPIWrapper:
             end_dt = datetime.fromisoformat(end_time.replace('Z', '+00:00'))
 
         # Implement retry logic with exponential backoff
+        sanitized_query = _URL_RE.sub("[URL]", full_query)
         for attempt in range(max_retries + 1):
             try:
-                sanitized_query = _URL_RE.sub("[URL]", full_query)
-                logger.debug(f"Twitter API search attempt {attempt + 1}/{max_retries + 1} for query: '{sanitized_query[:50]}...'")
+                _LOG.debug(f"Twitter API search attempt {attempt + 1}/{max_retries + 1} for query: '{sanitized_query[:50]}...'")
 
                 response = self.client.search_recent_tweets(
                     query=full_query,
@@ -171,31 +173,31 @@ class TwitterAPIWrapper:
                     "next_token": response.meta.get("next_token") if response.meta else None
                 }
 
-                logger.info(f"Twitter API search successful: found {len(tweets)} tweets")
+                _LOG.info(f"Twitter API search successful: found {len(tweets)} tweets")
                 return result
 
             except tweepy.TooManyRequests as e:
                 if attempt < max_retries:
                     wait_time = 2 ** attempt  # Exponential backoff: 1, 2, 4 seconds
-                    logger.warning(f"Twitter API rate limit exceeded. Retrying in {wait_time} seconds... (attempt {attempt + 1}/{max_retries + 1})")
+                    _LOG.warning(f"Twitter API rate limit exceeded. Retrying in {wait_time} seconds... (attempt {attempt + 1}/{max_retries + 1})")
                     time.sleep(wait_time)
                     continue
                 else:
-                    logger.error(f"Twitter API rate limit exceeded after {max_retries + 1} attempts")
+                    _LOG.error(f"Twitter API rate limit exceeded after {max_retries + 1} attempts")
                     raise TwitterAPIError(f"Twitter API rate limit exceeded after {max_retries + 1} attempts. Please try again later.")
 
             except tweepy.BadRequest as e:
-                raise TwitterAPIError(f"Invalid search query: {query}. Please check your query syntax.")
+                raise TwitterAPIError(f"Invalid search query: '{sanitized_query[:50]}...'. Please check your query syntax.")
             except tweepy.Unauthorized as e:
                 raise TwitterAPIError("Twitter API authentication failed during search. Token may be invalid.")
             except tweepy.TweepyException as e:
                 error_msg = f"Twitter API error: {str(e)}"
-                logger.error(error_msg)
+                _LOG.error(error_msg)
                 raise TwitterAPIError(error_msg)
 
             except Exception as e:
                 error_msg = f"Unexpected error during Twitter API search: {str(e)}"
-                logger.error(error_msg)
+                _LOG.error(error_msg)
                 raise TwitterAPIError(error_msg)
 
         # This should never be reached, but just in case
@@ -207,12 +209,12 @@ class TwitterAPIWrapper:
         if hasattr(tweet, 'referenced_tweets') and tweet.referenced_tweets:
             for ref in tweet.referenced_tweets:
                 if ref.type == 'retweeted':
-                    logger.debug(f"Skipping retweet: {tweet.id}")
+                    _LOG.debug(f"Skipping retweet: {tweet.id}")
                     return None
         
         # Skip if no text or media-only (assuming if text is empty or just URLs)
         if not hasattr(tweet, 'text') or not tweet.text or not tweet.text.strip():
-            logger.debug(f"Skipping media-only or empty tweet: {getattr(tweet, 'id', 'unknown')}")
+            _LOG.debug(f"Skipping media-only or empty tweet: {getattr(tweet, 'id', 'unknown')}")
             return None
         
         author = users.get(getattr(tweet, 'author_id', ''))
@@ -220,14 +222,14 @@ class TwitterAPIWrapper:
         
         # Skip if no author
         if not author_handle:
-            logger.debug(f"Skipping tweet with missing author: {getattr(tweet, 'id', 'unknown')}")
+            _LOG.debug(f"Skipping tweet with missing author: {getattr(tweet, 'id', 'unknown')}")
             return None
         
         sanitized_text = sanitize_text(tweet.text)
         
         # If after sanitization, text is empty, skip
         if not sanitized_text:
-            logger.debug(f"Skipping tweet with no content after sanitization: {getattr(tweet, 'id', 'unknown')}")
+            _LOG.debug(f"Skipping tweet with no content after sanitization: {getattr(tweet, 'id', 'unknown')}")
             return None
         
         # Ensure timestamp is ISO 8601 UTC
@@ -246,9 +248,9 @@ class TwitterAPIWrapper:
             author_handle=author_handle,
             permalink=f"https://twitter.com/{author_handle}/status/{getattr(tweet, 'id', '')}",
             created_timestamp=timestamp,
-            like_count=getattr(tweet, 'public_metrics', {}).get("like_count", 0) if hasattr(tweet, 'public_metrics') and tweet.public_metrics else 0,
-            repost_count=getattr(tweet, 'public_metrics', {}).get("retweet_count", 0) if hasattr(tweet, 'public_metrics') and tweet.public_metrics else 0,
-            reply_count=getattr(tweet, 'public_metrics', {}).get("reply_count", 0) if hasattr(tweet, 'public_metrics') and tweet.public_metrics else 0,
+            like_count=getattr(tweet, 'public_metrics', {}).get("like_count", 0) if isinstance(getattr(tweet, 'public_metrics', None), dict) else 0,
+            repost_count=getattr(tweet, 'public_metrics', {}).get("retweet_count", 0) if isinstance(getattr(tweet, 'public_metrics', None), dict) else 0,
+            reply_count=getattr(tweet, 'public_metrics', {}).get("reply_count", 0) if isinstance(getattr(tweet, 'public_metrics', None), dict) else 0,
             language=getattr(tweet, 'lang', '') or "",
             platform="twitter"
         )
@@ -269,11 +271,11 @@ class TwitterTool(BaseTool):
 
         try:
             wrapper = TwitterAPIWrapper(settings.api.twitter_api_key)
-            logger.info("TwitterTool initialized successfully")
+            _LOG.info("TwitterTool initialized successfully")
         except TwitterAPIError:
             raise  # Re-raise TwitterAPIError as-is
         except Exception as e:
-            logger.error(f"Failed to initialize TwitterTool: {str(e)}")
+            _LOG.error(f"Failed to initialize TwitterTool: {str(e)}")
             raise TwitterAPIError(f"Failed to initialize TwitterTool: {str(e)}")
 
         # Initialize Pydantic model with required fields
@@ -291,7 +293,7 @@ class TwitterTool(BaseTool):
 
         # Log search request (masking any sensitive data)
         safe_query = query.replace('\n', ' ').replace('\r', ' ')[:100]  # Truncate and clean
-        logger.info(f"Twitter search initiated: query='{safe_query}'..., filters={kwargs}")
+        _LOG.info(f"Twitter search initiated: query='{safe_query}'..., filters={kwargs}")
 
         try:
             response = self._wrapper.search_tweets(
@@ -309,15 +311,18 @@ class TwitterTool(BaseTool):
                     normalized_tweets.append(normalized.dict())
 
             execution_time = time.time() - start_time
-            logger.info(f"Twitter search completed: {len(normalized_tweets)} tweets found in {execution_time:.2f}s")
+            _LOG.info(f"Twitter search completed: {len(normalized_tweets)} tweets found in {execution_time:.2f}s")
 
             return normalized_tweets
 
         except TwitterAPIError:
             raise  # Re-raise TwitterAPIError as-is
         except Exception as e:
+            # Note: Unlike RedditTool which returns empty list on errors, TwitterTool raises
+            # exceptions to provide clear feedback about API issues (auth failures, rate limits, etc.)
+            # This allows calling code to handle different error types appropriately
             execution_time = time.time() - start_time
-            logger.error(f"Twitter search failed after {execution_time:.2f}s: {str(e)}")
+            _LOG.error(f"Twitter search failed after {execution_time:.2f}s: {str(e)}")
             raise TwitterAPIError(f"Twitter search failed: {str(e)}")
 
     async def _arun(
@@ -346,14 +351,12 @@ class TwitterTool(BaseTool):
 
         # Log search request (masking any sensitive data)
         safe_query = query.replace('\n', ' ').replace('\r', ' ')[:100]  # Truncate and clean
-        logger.info(f"Async Twitter search initiated: query='{safe_query}'..., max_results={max_results}")
+        _LOG.info(f"Async Twitter search initiated: query='{safe_query}'..., max_results={max_results}")
 
         try:
             # For simplicity, since tweepy is sync, run in thread
-            loop = asyncio.get_event_loop()
-            response = await loop.run_in_executor(
-                None,
-                lambda: self._wrapper.search_tweets(
+            def _sync_search():
+                return self._wrapper.search_tweets(
                     query=query,
                     max_results=max_results,
                     start_time=start_time,
@@ -361,7 +364,9 @@ class TwitterTool(BaseTool):
                     lang=lang,
                     next_token=None
                 )
-            )
+            
+            loop = asyncio.get_event_loop()
+            response = await loop.run_in_executor(None, _sync_search)
 
             normalized_tweets = []
             for tweet in response["tweets"]:
@@ -370,7 +375,7 @@ class TwitterTool(BaseTool):
                     normalized_tweets.append(normalized.dict())
 
             execution_time = time.time() - execution_start
-            logger.info(f"Async Twitter search completed: {len(normalized_tweets)} tweets found in {execution_time:.2f}s")
+            _LOG.info(f"Async Twitter search completed: {len(normalized_tweets)} tweets found in {execution_time:.2f}s")
 
             return normalized_tweets
 
@@ -378,5 +383,5 @@ class TwitterTool(BaseTool):
             raise  # Re-raise TwitterAPIError as-is
         except Exception as e:
             execution_time = time.time() - execution_start
-            logger.error(f"Async Twitter search failed after {execution_time:.2f}s: {str(e)}")
+            _LOG.error(f"Async Twitter search failed after {execution_time:.2f}s: {str(e)}")
             raise TwitterAPIError(f"Async Twitter search failed: {str(e)}")
