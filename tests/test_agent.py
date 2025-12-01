@@ -220,3 +220,30 @@ def test_tool_toggles(monkeypatch: pytest.MonkeyPatch) -> None:
     assert names == ["twitter", "google"]
 
     assert all(any(cb.__class__.__name__ == "_TelemetryCallbackHandler" for cb in t.callbacks) for t in instrumented)
+
+
+def test_tool_registry_all_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Registry should be empty when all tool flags are disabled."""
+
+    import types
+
+    class BaseDummyTool:
+        description = "dummy"
+        name = "dummy"
+
+        def __init__(self) -> None:
+            self.callbacks = []
+
+        @classmethod
+        def from_settings(cls, _settings):
+            return cls()
+
+    dummy_module = types.SimpleNamespace(RedditTool=BaseDummyTool, TwitterTool=BaseDummyTool, GoogleSearchTool=BaseDummyTool)
+    monkeypatch.setitem(sys.modules, "src.tools.reddit_tool", dummy_module)
+    monkeypatch.setitem(sys.modules, "src.tools.twitter_tool", dummy_module)
+    monkeypatch.setitem(sys.modules, "src.tools.google_search_tool", dummy_module)
+
+    settings = Settings(tools=ToolSettings(reddit_enabled=False, twitter_enabled=False, google_search_enabled=False))
+    tools = list(orchestrator._load_tools(settings))
+
+    assert tools == []
