@@ -168,6 +168,60 @@ def test_run_agent_smoke(monkeypatch: pytest.MonkeyPatch) -> None:
     assert result["metadata"]["total_sources_searched"] == 3
 
 
+def test_run_agent_retries_transient_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Transient failures should be retried with exponential backoff."""
+
+    class FlakyExecutor:
+        def __init__(self) -> None:
+            self.invocations = 0
+
+        def invoke(self, payload: dict[str, Any]) -> dict[str, Any]:
+            self.invocations += 1
+            if self.invocations == 1:
+                raise RuntimeError("transient")
+            return {
+                "query": payload.get("input", ""),
+                "pain_points": [{"text": "ok"}],
+                "metadata": {"total_sources_searched": 1, "execution_time": 0.01, "api_costs": 0.0},
+            }
+
+    executor = FlakyExecutor()
+    monkeypatch.setattr(pain_point_agent, "create_agent", lambda: executor)
+
+    sleeps: list[float] = []
+    monkeypatch.setattr(pain_point_agent.time, "sleep", lambda seconds: sleeps.append(seconds))
+
+    result = pain_point_agent.run_agent("transient test")
+
+    assert executor.invocations == 2
+    assert sleeps == [1.0]
+    assert result["metadata"]["total_sources_searched"] == 1
+
+
+def test_run_agent_stops_after_max_retries(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Persistent failures should surface after retries are exhausted."""
+
+    class AlwaysFailExecutor:
+        def __init__(self) -> None:
+            self.invocations = 0
+
+        def invoke(self, payload: dict[str, Any]) -> dict[str, Any]:
+            self.invocations += 1
+            raise RuntimeError("boom")
+
+    executor = AlwaysFailExecutor()
+    monkeypatch.setattr(pain_point_agent, "create_agent", lambda: executor)
+
+    sleeps: list[float] = []
+    monkeypatch.setattr(pain_point_agent.time, "sleep", lambda seconds: sleeps.append(seconds))
+
+    with pytest.raises(RuntimeError, match="boom"):
+        pain_point_agent.run_agent("will fail")
+
+    assert executor.invocations == 3
+    assert sleeps == [1.0, 2.0]
+
+
 def test_run_agent_rejects_invalid_query() -> None:
     """Input validation should block empty or non-string queries before invocation."""
 

@@ -2,11 +2,16 @@
 
 from __future__ import annotations
 
+import time
 from typing import Any, Dict, List, Mapping
 
 from config.settings import settings
 from src.agent.orchestrator import build_agent_executor
 from src.utils.validators import ValidationError, validate_query_length
+
+_MAX_RETRY_ATTEMPTS = 3
+_INITIAL_BACKOFF_SECONDS = 1.0
+_BACKOFF_MULTIPLIER = 2.0
 
 
 def create_agent() -> Any:
@@ -28,7 +33,22 @@ def run_agent(query: str) -> Dict[str, Any]:
 
     normalized_query = _validate_query(query)
     executor = create_agent()
-    result = executor.invoke({"input": normalized_query})
+
+    attempt = 0
+    backoff = _INITIAL_BACKOFF_SECONDS
+    while True:
+        try:
+            result = executor.invoke({"input": normalized_query})
+            break
+        except ValidationError:
+            raise
+        except Exception:
+            attempt += 1
+            if attempt >= _MAX_RETRY_ATTEMPTS:
+                raise
+            time.sleep(backoff)
+            backoff *= _BACKOFF_MULTIPLIER
+
     return _normalize_response(result, input_query=normalized_query)
 
 
