@@ -5,8 +5,18 @@ from __future__ import annotations
 from typing import Any, Dict, List
 
 from langchain.tools import BaseTool
+from pydantic import BaseModel, Field
 
 from config.settings import Settings
+
+
+class GoogleSearchToolInput(BaseModel):
+    """Input schema for GoogleSearchTool."""
+
+    query: str = Field(..., description="Search query for Google Custom Search.")
+
+    class Config:
+        extra = "forbid"
 
 
 class GoogleSearchTool(BaseTool):
@@ -14,6 +24,7 @@ class GoogleSearchTool(BaseTool):
 
     name: str = "google_search"
     description: str = "Search Google for discussions related to customer pain points."
+    args_schema: type[BaseModel] = GoogleSearchToolInput
 
     settings: Any = None
 

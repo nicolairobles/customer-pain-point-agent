@@ -16,14 +16,51 @@ import logging
 import os
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any, Dict, Iterable, List, Literal, Optional
 
 import praw
 from langchain.tools import BaseTool
-from pydantic import PrivateAttr
+from pydantic import BaseModel, Field, PrivateAttr, validator
 
 from config.settings import Settings
 from src.tools.reddit_parser import normalize_submission
+
+
+class RedditToolInput(BaseModel):
+    """Input schema for RedditTool."""
+
+    query: str = Field(..., description="Search query to run against Reddit.")
+    subreddits: List[str] = Field(
+        default_factory=lambda: ["all"],
+        description="One or more subreddit names to search (defaults to 'all').",
+    )
+    limit: int = Field(
+        15,
+        ge=1,
+        le=20,
+        description="Total number of posts to return across subreddits (capped at 20).",
+    )
+    per_subreddit: int = Field(
+        10,
+        ge=1,
+        le=25,
+        description="Posts to fetch per subreddit before merging and deduping.",
+    )
+    time_filter: Optional[Literal["hour", "day", "week", "month", "year", "all"]] = Field(
+        None,
+        description="Optional Reddit time filter window.",
+    )
+
+    @validator("subreddits", pre=True)
+    def _coerce_subreddits(cls, value: Any) -> List[str]:  # pylint: disable=no-self-argument
+        if value is None:
+            return ["all"]
+        if isinstance(value, str):
+            return [value]
+        return value
+
+    class Config:
+        extra = "forbid"
 
 _LOG = logging.getLogger(__name__)
 
@@ -38,6 +75,7 @@ class RedditTool(BaseTool):
 
     name: str = "reddit_search"
     description: str = "Search Reddit for discussions related to customer pain points."
+    args_schema: type[BaseModel] = RedditToolInput
 
     settings: Any = None
     _client: Any = PrivateAttr(default=None)
@@ -205,21 +243,19 @@ class RedditTool(BaseTool):
         merged.sort(key=lambda x: (x.get("upvotes", 0) + x.get("comments", 0)), reverse=True)
         return merged[:total_limit]
 
-    def _run(self, query: str, *args: Any, **kwargs: Any) -> List[Dict[str, Any]]:
-        """Synchronously execute the tool and return normalized search results.
+    def _run(
+        self,
+        query: str,
+        subreddits: Optional[List[str]] = None,
+        limit: int = 15,
+        per_subreddit: int = 10,
+        time_filter: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """Synchronously execute the tool and return normalized search results."""
 
-        Expected kwargs:
-        - subreddits: Optional[List[str]] (defaults to ['all'])
-        - limit: int total number of posts to return (default 15; capped 20)
-        - per_subreddit: int number of posts to request per subreddit (default 10)
-        - time_filter: Optional[str] forwarded to PRAW (e.g., 'day','week','month')
-        """
-
-        subreddits = kwargs.get("subreddits") or ["all"]
-        total_limit = int(kwargs.get("limit", 15))
-        total_limit = max(1, min(total_limit, 20))
-        per_subreddit = int(kwargs.get("per_subreddit", 10))
-        time_filter = kwargs.get("time_filter")  # e.g., 'day', 'week', 'month', 'year', 'all'
+        subreddits = subreddits or ["all"]
+        total_limit = max(1, min(int(limit), 20))
+        per_subreddit = max(1, min(int(per_subreddit), 25))
 
         start = time.time()
         results_by_sub: List[List[Dict[str, Any]]] = []
