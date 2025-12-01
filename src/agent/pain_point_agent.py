@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import time
-from typing import Any, Dict, List, Mapping
+from time import perf_counter
+from typing import Any, Dict, List, Mapping, Sequence
 
 from config.settings import settings
 from src.agent.orchestrator import build_agent_executor
@@ -36,6 +37,8 @@ def run_agent(query: str) -> Dict[str, Any]:
 
     attempt = 0
     backoff = _INITIAL_BACKOFF_SECONDS
+    start_time = perf_counter()
+    result: Mapping[str, Any] | Dict[str, Any]
     while True:
         try:
             result = executor.invoke({"input": normalized_query})
@@ -48,22 +51,51 @@ def run_agent(query: str) -> Dict[str, Any]:
                 raise
             time.sleep(backoff)
             backoff *= _BACKOFF_MULTIPLIER
+    duration_seconds = perf_counter() - start_time
 
-    return _normalize_response(result, input_query=normalized_query)
+    tools_used: Sequence[str] = []
+    if hasattr(executor, "get_used_tools"):
+        tools_used = getattr(executor, "get_used_tools")()
+
+    return _normalize_response(result, input_query=normalized_query, duration_seconds=duration_seconds, tools_used=tools_used)
 
 
-def _normalize_response(raw_result: Mapping[str, Any], input_query: str = "") -> Dict[str, Any]:
+def _normalize_response(
+    raw_result: Mapping[str, Any],
+    input_query: str = "",
+    duration_seconds: float | None = None,
+    tools_used: Sequence[str] | None = None,
+) -> Dict[str, Any]:
     """Normalize the raw agent output into the project JSON schema."""
 
     metadata_defaults: Dict[str, Any] = {
         "total_sources_searched": 0,
-        "execution_time": 0.0,
+        "execution_time": duration_seconds if duration_seconds is not None else 0.0,
         "api_costs": 0.0,
+        "tools_used": list(tools_used or []),
     }
     metadata = raw_result.get("metadata", {}) if isinstance(raw_result, Mapping) else {}
     normalized_metadata: Dict[str, Any] = {**metadata_defaults}
     if isinstance(metadata, Mapping):
         normalized_metadata.update(metadata)
+
+    if duration_seconds is not None:
+        normalized_metadata["execution_time"] = duration_seconds
+
+    tools: List[str] = []
+    seen_tools: set[str] = set()
+    for name in list(tools_used or []) + list(normalized_metadata.get("tools_used") or []):
+        if not isinstance(name, str):
+            continue
+        cleaned = name.strip()
+        if not cleaned:
+            continue
+        lower = cleaned.lower()
+        if lower in seen_tools:
+            continue
+        seen_tools.add(lower)
+        tools.append(cleaned)
+    normalized_metadata["tools_used"] = tools
 
     pain_points = raw_result.get("pain_points", []) if isinstance(raw_result, Mapping) else []
     pain_points = pain_points if isinstance(pain_points, list) else []

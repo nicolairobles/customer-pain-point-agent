@@ -248,9 +248,28 @@ def test_run_agent_normalizes_missing_fields(monkeypatch: pytest.MonkeyPatch) ->
 
     assert result["query"] == "singleword"
     assert result["pain_points"] == []
-    assert result["metadata"]["execution_time"] == 1.5
+    assert result["metadata"]["execution_time"] >= 0.0
     assert result["metadata"]["total_sources_searched"] == 0
     assert result["metadata"]["api_costs"] == 0.0
+    assert result["metadata"]["tools_used"] == []
+
+
+def test_run_agent_merges_telemetry_tools(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Tools observed via telemetry should be surfaced in metadata."""
+
+    class ToolAwareExecutor:
+        def invoke(self, payload: dict[str, Any]) -> dict[str, Any]:
+            return {"metadata": {"tools_used": ["metadata_tool"]}}
+
+        def get_used_tools(self) -> list[str]:
+            return ["reddit", "Twitter", "reddit"]
+
+    monkeypatch.setattr(pain_point_agent, "create_agent", lambda: ToolAwareExecutor())
+
+    result = pain_point_agent.run_agent("tool merge")
+
+    tools = result["metadata"]["tools_used"]
+    assert set(tools) == {"reddit", "Twitter", "metadata_tool"}
 
 
 def test_agent_error_handling(monkeypatch: pytest.MonkeyPatch) -> None:
