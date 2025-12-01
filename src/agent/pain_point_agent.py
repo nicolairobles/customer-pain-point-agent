@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import time
 from time import perf_counter
-from typing import Any, Dict, List, Mapping, Sequence
+from typing import Any, Dict, Iterable, List, Mapping, Sequence
 
 from config.settings import settings
 from src.agent.orchestrator import build_agent_executor
@@ -134,11 +134,37 @@ def _normalize_response(
     return response
 
 
-def stream_agent(query: str) -> List[Any]:
+def stream_agent(query: str) -> Iterable[Any]:
     """Stream the agent's intermediate messages for interactive UIs."""
 
+    normalized_query = _validate_query(query)
     executor = create_agent()
-    return list(executor.stream({"input": query}))
+
+    def _generator() -> Iterable[Any]:
+        start_time = perf_counter()
+        try:
+            for event in executor.stream({"input": normalized_query}):
+                yield event
+            duration = perf_counter() - start_time
+            tools_used: Sequence[str] = []
+            if hasattr(executor, "get_used_tools"):
+                tools_used = getattr(executor, "get_used_tools")()
+            summary = _normalize_response({}, input_query=normalized_query, duration_seconds=duration, tools_used=tools_used)
+            yield {"event": "complete", "metadata": summary["metadata"], "query": normalized_query}
+        except ValidationError:
+            raise
+        except Exception as exc:
+            duration = perf_counter() - start_time
+            tools_used = getattr(executor, "get_used_tools")() if hasattr(executor, "get_used_tools") else []
+            summary = _normalize_response({}, input_query=normalized_query, duration_seconds=duration, tools_used=tools_used)
+            yield {
+                "event": "error",
+                "query": normalized_query,
+                "error": _build_error_payload(exc),
+                "metadata": summary["metadata"],
+            }
+
+    return _generator()
 
 
 def _validate_query(query: str) -> str:

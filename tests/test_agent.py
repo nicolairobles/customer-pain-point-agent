@@ -273,6 +273,59 @@ def test_run_agent_merges_telemetry_tools(monkeypatch: pytest.MonkeyPatch) -> No
     assert set(tools) == {"reddit", "Twitter", "metadata_tool"}
 
 
+def test_stream_agent_yields_events(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Streamed events should be yielded progressively with a completion summary."""
+
+    class StreamingExecutor:
+        def __init__(self) -> None:
+            self.payloads: list[dict[str, Any]] = []
+
+        def stream(self, payload: dict[str, Any]):
+            self.payloads.append(payload)
+            yield {"event": "chunk", "data": 1}
+            yield {"event": "chunk", "data": 2}
+
+    executor = StreamingExecutor()
+    monkeypatch.setattr(pain_point_agent, "create_agent", lambda: executor)
+
+    events = list(pain_point_agent.stream_agent("stream query"))
+
+    assert executor.payloads[0]["input"] == "stream query"
+    assert events[0]["event"] == "chunk"
+    assert events[1]["event"] == "chunk"
+    assert events[-1]["event"] == "complete"
+    assert "execution_time" in events[-1]["metadata"]
+    assert events[-1]["metadata"]["tools_used"] == []
+
+
+def test_stream_agent_surfaces_errors(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Streaming failures should emit a structured error event instead of raising."""
+
+    class FailingStreamExecutor:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def stream(self, payload: dict[str, Any]):
+            self.calls += 1
+            raise RuntimeError("stream failure")
+
+        def get_used_tools(self) -> list[str]:
+            return ["stream_tool"]
+
+    executor = FailingStreamExecutor()
+    monkeypatch.setattr(pain_point_agent, "create_agent", lambda: executor)
+
+    events = list(pain_point_agent.stream_agent("stream failure"))
+
+    assert executor.calls == 1
+    assert len(events) == 1
+    error_event = events[0]
+    assert error_event["event"] == "error"
+    assert error_event["error"]["type"] == "RuntimeError"
+    assert "execution_time" in error_event["metadata"]
+    assert error_event["metadata"]["tools_used"] == ["stream_tool"]
+
+
 def test_agent_error_handling(monkeypatch: pytest.MonkeyPatch) -> None:
     """Simulate tool failure and ensure agent surfaces a structured error."""
 
