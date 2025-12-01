@@ -83,6 +83,7 @@ def _install_fake_langchain(monkeypatch: pytest.MonkeyPatch, call_log: dict[str,
     fake_agents = types.SimpleNamespace(create_react_agent=fake_create_react_agent)
     fake_prompts = types.SimpleNamespace(ChatPromptTemplate=FakeChatPromptTemplate, MessagesPlaceholder=FakeMessagesPlaceholder)
     fake_llms_base = types.SimpleNamespace(LLM=FakeLLM)
+    fake_callbacks_base = types.SimpleNamespace(BaseCallbackHandler=object)
 
     monkeypatch.setitem(sys.modules, "langchain", fake_langchain)
     monkeypatch.setitem(sys.modules, "langchain.agents", fake_agents)
@@ -90,6 +91,8 @@ def _install_fake_langchain(monkeypatch: pytest.MonkeyPatch, call_log: dict[str,
     monkeypatch.setitem(sys.modules, "langchain_core.prompts", fake_prompts)
     monkeypatch.setitem(sys.modules, "langchain_core.language_models", types.SimpleNamespace(llms=fake_llms_base))
     monkeypatch.setitem(sys.modules, "langchain_core.language_models.llms", fake_llms_base)
+    monkeypatch.setitem(sys.modules, "langchain_core.callbacks", types.SimpleNamespace(base=fake_callbacks_base))
+    monkeypatch.setitem(sys.modules, "langchain_core.callbacks.base", fake_callbacks_base)
 
 
 def test_build_agent_executor_invokes_initialize_agent(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -187,6 +190,7 @@ def test_tool_toggles(monkeypatch: pytest.MonkeyPatch) -> None:
 
         def __init__(self, name: str) -> None:
             self.name = name
+            self.callbacks = []
 
         @classmethod
         def from_settings(cls, _settings):
@@ -209,7 +213,10 @@ def test_tool_toggles(monkeypatch: pytest.MonkeyPatch) -> None:
 
     settings = Settings(tools=ToolSettings(reddit_enabled=False, twitter_enabled=True, google_search_enabled=True))
     tools = list(orchestrator._load_tools(settings))
+    instrumented = orchestrator._attach_telemetry(tools, orchestrator._TelemetryCallbackHandler())
 
-    names = [t.name for t in tools]
+    names = [t.name for t in instrumented]
     assert "reddit" not in names
     assert names == ["twitter", "google"]
+
+    assert all(any(cb.__class__.__name__ == "_TelemetryCallbackHandler" for cb in t.callbacks) for t in instrumented)

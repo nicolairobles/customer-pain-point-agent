@@ -19,6 +19,7 @@ def build_agent_executor(settings: Settings) -> Any:
     try:
         import langchain as _langchain
         from langchain.agents import create_react_agent  # type: ignore
+        from langchain_core.callbacks.base import BaseCallbackHandler  # type: ignore
         from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder  # type: ignore
     except Exception as exc:  # pragma: no cover - environment specific
         raise ImportError(
@@ -46,6 +47,7 @@ def build_agent_executor(settings: Settings) -> Any:
 
     tools = _load_tools(settings)
     llm = _build_llm(settings)
+    telemetry_handler = _TelemetryCallbackHandler()
 
     prompt = ChatPromptTemplate.from_messages(
         [
@@ -55,7 +57,8 @@ def build_agent_executor(settings: Settings) -> Any:
         ]
     )
 
-    agent_graph = create_react_agent(llm=llm, tools=tools, prompt=prompt)
+    instrumented_tools = _attach_telemetry(tools, telemetry_handler)
+    agent_graph = create_react_agent(llm=llm, tools=instrumented_tools, prompt=prompt)
     return _AgentRunner(agent_graph, settings)
 
 
@@ -154,3 +157,49 @@ class _AgentRunner:
 
     def stream(self, payload: Dict[str, Any]):
         yield from self._agent.stream(payload, config={"recursion_limit": self._recursion_limit})
+
+
+def _attach_telemetry(tools: Iterable[Any], handler: Any) -> List[Any]:
+    """Attach telemetry callbacks to each tool instance."""
+
+    instrumented: List[Any] = []
+    for tool in tools:
+        callbacks = list(getattr(tool, "callbacks", []) or [])
+        callbacks.append(handler)
+        try:
+            tool.callbacks = callbacks
+        except Exception:
+            # If assignment fails, proceed without callbacks to avoid breaking execution.
+            pass
+        instrumented.append(tool)
+    return instrumented
+
+
+class _TelemetryCallbackHandler:
+    """Lightweight logger for tool invocation events (non-sensitive)."""
+
+    def __init__(self) -> None:
+        import logging
+
+        self._log = logging.getLogger(__name__)
+
+    def on_tool_start(self, serialized: Dict[str, Any] | None = None, input_str: str | None = None, **kwargs: Any) -> None:
+        tool_name = (serialized or {}).get("name", "<unknown>")
+        summary = _summarize_input(input_str)
+        self._log.info("tool_start name=%s input=%s", tool_name, summary)
+
+    def on_tool_end(self, output: Any, **kwargs: Any) -> None:
+        self._log.info("tool_end output_type=%s", type(output).__name__)
+
+
+def _summarize_input(input_str: Any) -> str:
+    """Return a minimal, non-sensitive summary of tool input."""
+
+    if input_str is None:
+        return "<none>"
+    if isinstance(input_str, dict):
+        return f"dict_keys={list(input_str.keys())}"
+    if isinstance(input_str, str):
+        preview = input_str[:80].replace("\n", " ")
+        return f"str(len={len(input_str)} preview='{preview}')"
+    return f"type={type(input_str).__name__}"
