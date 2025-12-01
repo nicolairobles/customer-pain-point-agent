@@ -10,6 +10,7 @@ import pytest
 
 from config.settings import AgentSettings, Settings, ToolSettings
 from src.agent import orchestrator, pain_point_agent
+from src.utils.validators import ValidationError
 
 
 def test_normalize_response_structure() -> None:
@@ -165,6 +166,37 @@ def test_run_agent_smoke(monkeypatch: pytest.MonkeyPatch) -> None:
     assert result["pain_points"]
     assert "metadata" in result
     assert result["metadata"]["total_sources_searched"] == 3
+
+
+def test_run_agent_rejects_invalid_query() -> None:
+    """Input validation should block empty or non-string queries before invocation."""
+
+    with pytest.raises(ValidationError):
+        pain_point_agent.run_agent("")  # type: ignore[arg-type]
+
+    with pytest.raises(ValidationError):
+        pain_point_agent.run_agent("   ")
+
+    with pytest.raises(ValidationError):
+        pain_point_agent.run_agent(None)  # type: ignore[arg-type]
+
+
+def test_run_agent_normalizes_missing_fields(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Normalization should backfill defaults when the agent omits fields."""
+
+    class PartialExecutor:
+        def invoke(self, payload: dict[str, Any]) -> dict[str, Any]:
+            return {"metadata": {"execution_time": 1.5}}
+
+    monkeypatch.setattr(pain_point_agent, "create_agent", lambda: PartialExecutor())
+
+    result = pain_point_agent.run_agent("singleword")
+
+    assert result["query"] == "singleword"
+    assert result["pain_points"] == []
+    assert result["metadata"]["execution_time"] == 1.5
+    assert result["metadata"]["total_sources_searched"] == 0
+    assert result["metadata"]["api_costs"] == 0.0
 
 
 def test_agent_error_handling(monkeypatch: pytest.MonkeyPatch) -> None:
