@@ -20,7 +20,7 @@ from typing import Any, Dict, Iterable, List, Literal, Optional
 
 import praw
 from langchain.tools import BaseTool
-from pydantic import BaseModel, Field, PrivateAttr, validator
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, field_validator
 
 from config.settings import Settings
 from src.tools.reddit_parser import normalize_submission
@@ -51,16 +51,16 @@ class RedditToolInput(BaseModel):
         description="Optional Reddit time filter window.",
     )
 
-    @validator("subreddits", pre=True)
-    def _coerce_subreddits(cls, value: Any) -> List[str]:  # pylint: disable=no-self-argument
+    model_config = ConfigDict(extra="forbid")
+
+    @field_validator("subreddits", mode="before")
+    @classmethod
+    def _coerce_subreddits(cls, value: Any) -> List[str]:
         if value is None:
             return ["all"]
         if isinstance(value, str):
             return [value]
         return value
-
-    class Config:
-        extra = "forbid"
 
 _LOG = logging.getLogger(__name__)
 

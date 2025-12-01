@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any, Dict, List
 
 from langchain.tools import BaseTool
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from config.settings import Settings
 
@@ -15,8 +15,7 @@ class GoogleSearchToolInput(BaseModel):
 
     query: str = Field(..., description="Search query for Google Custom Search.")
 
-    class Config:
-        extra = "forbid"
+    model_config = ConfigDict(extra="forbid")
 
 
 class GoogleSearchTool(BaseTool):

@@ -6,4 +6,4 @@ tweepy
 google-api-python-client
 python-dotenv
 pytest
-pydantic>=1.10,<2
+pydantic>=2,<3
