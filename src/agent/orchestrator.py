@@ -8,7 +8,7 @@ from config.settings import Settings
 
 
 def build_agent_executor(settings: Settings) -> Any:
-    """Construct an AgentExecutor configured with project tools and prompts.
+    """Construct an Agent executor configured with project tools and prompts.
 
     LangChain imports are deferred until this function is called so that the
     module can be imported in environments with incompatible LangChain
@@ -18,29 +18,20 @@ def build_agent_executor(settings: Settings) -> Any:
 
     try:
         import langchain as _langchain
-        from langchain.agents import AgentExecutor, initialize_agent  # type: ignore
-        from langchain.tools import BaseTool  # type: ignore
+        from langchain.agents import create_react_agent  # type: ignore
+        from langchain_core.callbacks.base import BaseCallbackHandler  # type: ignore
+        from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder  # type: ignore
     except Exception as exc:  # pragma: no cover - environment specific
-        # Be explicit about likely causes: missing package, incompatible
-        # version, or changes to the public API. `requirements.txt` already
-        # contains a broad constraint (`langchain>=0.0.200,<1`), so if you've
-        # installed from a newer or older source, check the installed
-        # `langchain.__version__` and confirm it matches the project's
-        # compatibility. Pin a known-working version if necessary.
         raise ImportError(
-            "Failed to import required classes from langchain. This can happen if "
-            "the package is not installed, or the installed `langchain` version is "
-            "incompatible with this code. Check `pip show langchain` (or inspect "
-            "`langchain.__version__`) and ensure it satisfies the project's constraint "
-            "(e.g. `langchain>=0.0.200,<1`). If needed, pin/install a compatible "
-            "version in your environment."
+            "Failed to import required classes from langchain. This can happen if the package is not "
+            "installed or if the installed version is incompatible with this code. Ensure `langchain>=1.0.7,<2` "
+            "is available in your environment."
         ) from exc
 
     # Log LangChain version for diagnostic purposes when the agent is built.
     try:
         _lc_ver = getattr(_langchain, "__version__", None)
         if _lc_ver is None:
-            # Fallback to importlib.metadata if available
             try:
                 from importlib import metadata as _metadata
 
@@ -51,21 +42,24 @@ def build_agent_executor(settings: Settings) -> Any:
 
         logging.getLogger(__name__).info("Using langchain version=%s", _lc_ver)
     except Exception:
-        # Version logging is purely diagnostic; never block agent construction if
-        # telemetry lookups fail (e.g., metadata missing in constrained envs).
+        # Version logging is diagnostic only.
         pass
 
     tools = _load_tools(settings)
     llm = _build_llm(settings)
-    agent = initialize_agent(
-        tools=tools,
-        llm=llm,
-        agent="zero-shot-react-description",
-        verbose=settings.agent.verbose,
-        max_iterations=max(1, settings.agent.max_iterations),
-        handle_parsing_errors=True,
+    telemetry_handler = _TelemetryCallbackHandler()
+
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", "You are a helpful assistant that researches customer pain points using the provided tools."),
+            ("human", "{input}"),
+            MessagesPlaceholder("agent_scratchpad"),
+        ]
     )
-    return agent
+
+    instrumented_tools = _attach_telemetry(tools, telemetry_handler)
+    agent_graph = create_react_agent(llm=llm, tools=instrumented_tools, prompt=prompt)
+    return _AgentRunner(agent_graph, settings)
 
 
 def _load_tools(settings: Settings) -> List[Any]:
@@ -85,16 +79,28 @@ def _iter_tools(settings: Settings) -> Iterable[Any]:
     from src.tools.twitter_tool import TwitterTool
     from src.tools.google_search_tool import GoogleSearchTool
 
-    yield RedditTool.from_settings(settings)
-    yield TwitterTool.from_settings(settings)
-    yield GoogleSearchTool.from_settings(settings)
+    tool_settings = getattr(settings, "tools", None)
+
+    def is_enabled(flag: str) -> bool:
+        if tool_settings is None:
+            return True
+        return getattr(tool_settings, flag, True)
+
+    if is_enabled("reddit_enabled"):
+        yield RedditTool.from_settings(settings)
+
+    if is_enabled("twitter_enabled"):
+        yield TwitterTool.from_settings(settings)
+
+    if is_enabled("google_search_enabled"):
+        yield GoogleSearchTool.from_settings(settings)
 
 
 def _build_llm(settings: Settings) -> Any:
     """Instantiate an LLM backed by the OpenAIService wrapper (settings-driven)."""
 
     try:
-        from langchain.llms.base import LLM  # type: ignore
+        from langchain_core.language_models.llms import LLM  # type: ignore
     except Exception as exc:  # pragma: no cover - environment specific
         raise ImportError(
             "LangChain LLM base class not available. Confirm `langchain` satisfies project constraints."
@@ -137,3 +143,63 @@ def _build_llm(settings: Settings) -> Any:
     service_settings = settings.llm
     service = OpenAIService.from_settings(settings)
     return OpenAIServiceLLM(service)
+
+
+class _AgentRunner:
+    """Lightweight adapter exposing invoke/stream on the LangGraph agent."""
+
+    def __init__(self, agent_graph: Any, settings: Settings) -> None:
+        self._agent = agent_graph
+        self._recursion_limit = max(1, settings.agent.max_iterations)
+
+    def invoke(self, payload: Dict[str, Any]) -> Any:
+        return self._agent.invoke(payload, config={"recursion_limit": self._recursion_limit})
+
+    def stream(self, payload: Dict[str, Any]):
+        yield from self._agent.stream(payload, config={"recursion_limit": self._recursion_limit})
+
+
+def _attach_telemetry(tools: Iterable[Any], handler: Any) -> List[Any]:
+    """Attach telemetry callbacks to each tool instance."""
+
+    instrumented: List[Any] = []
+    for tool in tools:
+        callbacks = list(getattr(tool, "callbacks", []) or [])
+        callbacks.append(handler)
+        try:
+            tool.callbacks = callbacks
+        except Exception:
+            # If assignment fails, proceed without callbacks to avoid breaking execution.
+            pass
+        instrumented.append(tool)
+    return instrumented
+
+
+class _TelemetryCallbackHandler:
+    """Lightweight logger for tool invocation events (non-sensitive)."""
+
+    def __init__(self) -> None:
+        import logging
+
+        self._log = logging.getLogger(__name__)
+
+    def on_tool_start(self, serialized: Dict[str, Any] | None = None, input_str: str | None = None, **kwargs: Any) -> None:
+        tool_name = (serialized or {}).get("name", "<unknown>")
+        summary = _summarize_input(input_str)
+        self._log.info("tool_start name=%s input=%s", tool_name, summary)
+
+    def on_tool_end(self, output: Any, **kwargs: Any) -> None:
+        self._log.info("tool_end output_type=%s", type(output).__name__)
+
+
+def _summarize_input(input_str: Any) -> str:
+    """Return a minimal, non-sensitive summary of tool input."""
+
+    if input_str is None:
+        return "<none>"
+    if isinstance(input_str, dict):
+        return f"dict_keys={list(input_str.keys())}"
+    if isinstance(input_str, str):
+        preview = input_str[:80].replace("\n", " ")
+        return f"str(len={len(input_str)} preview='{preview}')"
+    return f"type={type(input_str).__name__}"

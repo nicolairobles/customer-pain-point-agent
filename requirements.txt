@@ -1,4 +1,4 @@
-langchain==0.0.340
+langchain>=1.0.7,<2
 openai
 streamlit
 praw
@@ -6,4 +6,4 @@ tweepy
 google-api-python-client
 python-dotenv
 pytest
-pydantic>=1.10,<2
+pydantic>=2,<3

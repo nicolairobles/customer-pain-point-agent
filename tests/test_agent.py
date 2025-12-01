@@ -8,7 +8,7 @@ from typing import Any
 
 import pytest
 
-from config.settings import AgentSettings, Settings
+from config.settings import AgentSettings, Settings, ToolSettings
 from src.agent import orchestrator, pain_point_agent
 
 
@@ -36,54 +36,41 @@ def _install_fake_langchain(monkeypatch: pytest.MonkeyPatch, call_log: dict[str,
 
     fake_langchain = types.SimpleNamespace(__version__="0.0.test")
 
-    class FakeAgentExecutor:
-        def __init__(self, agent=None, tools=None, verbose=None):
-            self.agent = agent
+    class FakeReactAgent:
+        def __init__(self, llm=None, tools=None, prompt=None):
             self.tools = tools or []
-            self.verbose = verbose
-
-    class FakeInitializedAgent:
-        def __init__(self, tools, llm, verbose, max_iterations, handle_parsing_errors):
-            self.tools = tools
             self.llm = llm
-            self.verbose = verbose
-            self.max_iterations = max_iterations
-            self.handle_parsing_errors = handle_parsing_errors
+            self.prompt = prompt
 
-        def invoke(self, payload: dict[str, Any]) -> dict[str, Any]:
+        def invoke(self, payload: dict[str, Any], config: dict[str, Any] | None = None) -> dict[str, Any]:
+            call_log["invoke_config"] = config
             return {
                 "tools": [getattr(t, "name", "<anon>") for t in self.tools],
                 "llm_type": getattr(self.llm, "_llm_type", "unknown"),
                 "payload": payload,
-                "max_iterations": self.max_iterations,
-                "verbose": self.verbose,
+                "recursion_limit": (config or {}).get("recursion_limit"),
             }
 
-        def stream(self, payload: dict[str, Any]):
+        def stream(self, payload: dict[str, Any], config: dict[str, Any] | None = None):
+            call_log["stream_config"] = config
             yield {"event": "start", "payload": payload}
             yield {"event": "end"}
 
-    def fake_initialize_agent(*, tools, llm, agent, verbose, max_iterations, handle_parsing_errors):
-        call_log.update(
-            {
-                "tools": tools,
-                "llm": llm,
-                "agent": agent,
-                "verbose": verbose,
-                "max_iterations": max_iterations,
-                "handle_parsing_errors": handle_parsing_errors,
-            }
-        )
-        return FakeInitializedAgent(tools, llm, verbose, max_iterations, handle_parsing_errors)
+    def fake_create_react_agent(llm=None, tools=None, prompt=None):
+        call_log.update({"tools": tools, "llm": llm, "prompt": prompt})
+        return FakeReactAgent(llm=llm, tools=tools, prompt=prompt)
 
-    fake_agents = types.SimpleNamespace(
-        AgentExecutor=FakeAgentExecutor,
-        initialize_agent=fake_initialize_agent,
-    )
-    fake_tools_module = types.SimpleNamespace()
-    fake_tools_module.BaseTool = object
+    class FakeChatPromptTemplate:
+        def __init__(self, messages):
+            self.messages = messages
 
-    fake_llms_base = types.SimpleNamespace()
+        @classmethod
+        def from_messages(cls, messages):
+            return cls(messages)
+
+    class FakeMessagesPlaceholder:
+        def __init__(self, variable_name):
+            self.variable_name = variable_name
 
     class FakeLLM:
         @property
@@ -93,13 +80,19 @@ def _install_fake_langchain(monkeypatch: pytest.MonkeyPatch, call_log: dict[str,
         def _call(self, prompt: str, stop=None, run_manager=None, **kwargs: Any) -> str:
             return prompt
 
-    fake_llms_base.LLM = FakeLLM
+    fake_agents = types.SimpleNamespace(create_react_agent=fake_create_react_agent)
+    fake_prompts = types.SimpleNamespace(ChatPromptTemplate=FakeChatPromptTemplate, MessagesPlaceholder=FakeMessagesPlaceholder)
+    fake_llms_base = types.SimpleNamespace(LLM=FakeLLM)
+    fake_callbacks_base = types.SimpleNamespace(BaseCallbackHandler=object)
 
     monkeypatch.setitem(sys.modules, "langchain", fake_langchain)
     monkeypatch.setitem(sys.modules, "langchain.agents", fake_agents)
-    monkeypatch.setitem(sys.modules, "langchain.tools", fake_tools_module)
-    monkeypatch.setitem(sys.modules, "langchain.llms", types.SimpleNamespace(base=fake_llms_base))
-    monkeypatch.setitem(sys.modules, "langchain.llms.base", fake_llms_base)
+    monkeypatch.setitem(sys.modules, "langchain_core", types.SimpleNamespace())
+    monkeypatch.setitem(sys.modules, "langchain_core.prompts", fake_prompts)
+    monkeypatch.setitem(sys.modules, "langchain_core.language_models", types.SimpleNamespace(llms=fake_llms_base))
+    monkeypatch.setitem(sys.modules, "langchain_core.language_models.llms", fake_llms_base)
+    monkeypatch.setitem(sys.modules, "langchain_core.callbacks", types.SimpleNamespace(base=fake_callbacks_base))
+    monkeypatch.setitem(sys.modules, "langchain_core.callbacks.base", fake_callbacks_base)
 
 
 def test_build_agent_executor_invokes_initialize_agent(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -119,9 +112,12 @@ def test_build_agent_executor_invokes_initialize_agent(monkeypatch: pytest.Monke
 
     executor = orchestrator.build_agent_executor(settings)
 
-    assert executor.invoke({"input": "hello"})["tools"] == ["dummy_tool"]
-    assert call_log["max_iterations"] == 3
-    assert call_log["verbose"] is True
+    result = executor.invoke({"input": "hello"})
+    assert result["tools"] == ["dummy_tool"]
+    assert result["recursion_limit"] == 3
+    assert call_log["prompt"]
+    assert call_log["tools"] == [dummy_tool]
+    assert call_log["llm"]._llm_type == "dummy"
 
 
 def test_agent_stream_interface(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -142,6 +138,7 @@ def test_agent_stream_interface(monkeypatch: pytest.MonkeyPatch) -> None:
     events = list(executor.stream({"input": "stream-test"}))
     assert events[0]["event"] == "start"
     assert events[-1]["event"] == "end"
+    assert call_log["stream_config"]["recursion_limit"] == 2
 
 
 def test_run_agent_smoke(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -181,3 +178,88 @@ def test_agent_error_handling(monkeypatch: pytest.MonkeyPatch) -> None:
 
     with pytest.raises(RuntimeError, match="tool boom"):
         pain_point_agent.run_agent("failure-query")
+
+
+def test_tool_toggles(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Ensure tool enable flags control registry output."""
+
+    import types
+
+    class BaseDummyTool:
+        description = "dummy"
+
+        def __init__(self, name: str) -> None:
+            self.name = name
+            self.callbacks = []
+
+        @classmethod
+        def from_settings(cls, _settings):
+            return cls(cls.name)  # type: ignore[attr-defined]
+
+    class DummyRedditTool(BaseDummyTool):
+        name = "reddit"
+
+    class DummyTwitterTool(BaseDummyTool):
+        name = "twitter"
+
+    class DummyGoogleSearchTool(BaseDummyTool):
+        name = "google"
+
+    monkeypatch.setitem(sys.modules, "src.tools.reddit_tool", types.SimpleNamespace(RedditTool=DummyRedditTool))
+    monkeypatch.setitem(sys.modules, "src.tools.twitter_tool", types.SimpleNamespace(TwitterTool=DummyTwitterTool))
+    monkeypatch.setitem(
+        sys.modules, "src.tools.google_search_tool", types.SimpleNamespace(GoogleSearchTool=DummyGoogleSearchTool)
+    )
+
+    settings = Settings(tools=ToolSettings(reddit_enabled=False, twitter_enabled=True, google_search_enabled=True))
+    tools = list(orchestrator._load_tools(settings))
+    instrumented = orchestrator._attach_telemetry(tools, orchestrator._TelemetryCallbackHandler())
+
+    names = [t.name for t in instrumented]
+    assert "reddit" not in names
+    assert names == ["twitter", "google"]
+
+    assert all(any(cb.__class__.__name__ == "_TelemetryCallbackHandler" for cb in t.callbacks) for t in instrumented)
+
+
+def test_tool_registry_all_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Registry should be empty when all tool flags are disabled."""
+
+    import types
+
+    class BaseDummyTool:
+        description = "dummy"
+        name = "dummy"
+
+        def __init__(self) -> None:
+            self.callbacks = []
+
+        @classmethod
+        def from_settings(cls, _settings):
+            return cls()
+
+    dummy_module = types.SimpleNamespace(RedditTool=BaseDummyTool, TwitterTool=BaseDummyTool, GoogleSearchTool=BaseDummyTool)
+    monkeypatch.setitem(sys.modules, "src.tools.reddit_tool", dummy_module)
+    monkeypatch.setitem(sys.modules, "src.tools.twitter_tool", dummy_module)
+    monkeypatch.setitem(sys.modules, "src.tools.google_search_tool", dummy_module)
+
+    settings = Settings(tools=ToolSettings(reddit_enabled=False, twitter_enabled=False, google_search_enabled=False))
+    tools = list(orchestrator._load_tools(settings))
+
+    assert tools == []
+
+
+def test_telemetry_logging_sanitizes_input(caplog: pytest.LogCaptureFixture) -> None:
+    """Telemetry should log tool events with sanitized input metadata."""
+
+    handler = orchestrator._TelemetryCallbackHandler()
+
+    with caplog.at_level("INFO", logger="src.agent.orchestrator"):
+        handler.on_tool_start({"name": "sample_tool"}, {"secret": "should_not_show"})
+        handler.on_tool_end(output={"result": "ok"})
+
+    messages = [record.message for record in caplog.records]
+    assert any("tool_start" in msg and "dict_keys" in msg for msg in messages)
+    # Ensure sensitive values are not logged.
+    assert all("should_not_show" not in msg for msg in messages)
+    assert any("tool_end" in msg and "dict" in msg for msg in messages)

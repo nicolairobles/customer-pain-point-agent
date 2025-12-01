@@ -3,11 +3,20 @@
 from __future__ import annotations
 
 import pytest
+from pydantic import ValidationError
 
 from config.settings import settings
 from src.tools.google_search_tool import GoogleSearchTool
 from src.tools.reddit_tool import RedditTool
 from src.tools.twitter_tool import TwitterTool
+
+
+def _json_schema(model_cls):
+    """Return a Pydantic JSON schema across v1/v2."""
+
+    if hasattr(model_cls, "model_json_schema"):
+        return model_cls.model_json_schema()
+    return model_cls.schema()
 
 
 def test_tool_factory_methods() -> None:
@@ -27,7 +36,7 @@ def test_tool_run_not_implemented(tool_class) -> None:
 
     tool = tool_class.from_settings(settings)
     with pytest.raises(NotImplementedError):
-        tool.run("sample query")
+        tool.run({"query": "sample query"})
 
 
 def test_reddit_tool_run_returns_results(monkeypatch):
@@ -70,7 +79,7 @@ def test_reddit_tool_run_returns_results(monkeypatch):
     monkeypatch.setattr(praw, "Reddit", fake_reddit_constructor)
 
     tool = RedditTool.from_settings(settings)
-    results = tool.run("test")
+    results = tool.run({"query": "test"})
     assert isinstance(results, list)
     assert len(results) == 1
     payload = results[0]
@@ -79,3 +88,33 @@ def test_reddit_tool_run_returns_results(monkeypatch):
     assert payload["url"] == "https://example.com"
     assert payload["created_at"].endswith("+00:00")
     assert "nsfw" in payload["content_flags"]
+
+
+def test_tool_arg_schemas_are_defined_and_strict() -> None:
+    reddit_tool = RedditTool.from_settings(settings)
+    reddit_schema = _json_schema(reddit_tool.args_schema)
+    reddit_props = reddit_schema["properties"]
+
+    assert reddit_tool.name == "reddit_search"
+    assert reddit_tool.description
+    assert reddit_schema["required"] == ["query"]
+    assert reddit_props["subreddits"]["type"] == "array"
+    assert reddit_props["limit"]["maximum"] == 20
+    assert reddit_props["per_subreddit"]["maximum"] == 25
+    time_filter_enum = reddit_props["time_filter"].get("enum") or reddit_props["time_filter"].get("anyOf", [{}])[0].get("enum")
+    assert set(time_filter_enum) == {"hour", "day", "week", "month", "year", "all"}
+
+    with pytest.raises(ValidationError):
+        reddit_tool.run({"query": "q", "unknown": "noop"})
+
+    for tool_class in (TwitterTool, GoogleSearchTool):
+        tool = tool_class.from_settings(settings)
+        schema = _json_schema(tool.args_schema)
+        props = schema["properties"]
+
+        assert tool.description
+        assert schema["required"] == ["query"]
+        assert list(props.keys()) == ["query"]
+        assert props["query"]["type"] == "string"
+        with pytest.raises(ValidationError):
+            tool.run({"query": "q", "unexpected": True})

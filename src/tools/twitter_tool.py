@@ -5,8 +5,17 @@ from __future__ import annotations
 from typing import Any, Dict, List
 
 from langchain.tools import BaseTool
+from pydantic import BaseModel, ConfigDict, Field
 
 from config.settings import Settings
+
+
+class TwitterToolInput(BaseModel):
+    """Input schema for TwitterTool."""
+
+    query: str = Field(..., description="Search query for relevant Twitter discussions.")
+
+    model_config = ConfigDict(extra="forbid")
 
 
 class TwitterTool(BaseTool):
@@ -14,6 +23,7 @@ class TwitterTool(BaseTool):
 
     name: str = "twitter_search"
     description: str = "Search Twitter for discussions related to customer pain points."
+    args_schema: type[BaseModel] = TwitterToolInput
 
     settings: Any = None
 
