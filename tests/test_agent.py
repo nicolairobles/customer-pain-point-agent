@@ -247,3 +247,19 @@ def test_tool_registry_all_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
     tools = list(orchestrator._load_tools(settings))
 
     assert tools == []
+
+
+def test_telemetry_logging_sanitizes_input(caplog: pytest.LogCaptureFixture) -> None:
+    """Telemetry should log tool events with sanitized input metadata."""
+
+    handler = orchestrator._TelemetryCallbackHandler()
+
+    with caplog.at_level("INFO", logger="src.agent.orchestrator"):
+        handler.on_tool_start({"name": "sample_tool"}, {"secret": "should_not_show"})
+        handler.on_tool_end(output={"result": "ok"})
+
+    messages = [record.message for record in caplog.records]
+    assert any("tool_start" in msg and "dict_keys" in msg for msg in messages)
+    # Ensure sensitive values are not logged.
+    assert all("should_not_show" not in msg for msg in messages)
+    assert any("tool_end" in msg and "dict" in msg for msg in messages)
