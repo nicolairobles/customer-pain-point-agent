@@ -38,17 +38,19 @@ def run_agent(query: str) -> Dict[str, Any]:
     attempt = 0
     backoff = _INITIAL_BACKOFF_SECONDS
     start_time = perf_counter()
-    result: Mapping[str, Any] | Dict[str, Any]
+    result: Mapping[str, Any] | Dict[str, Any] | None = None
+    last_error: Exception | None = None
     while True:
         try:
             result = executor.invoke({"input": normalized_query})
             break
         except ValidationError:
             raise
-        except Exception:
+        except Exception as exc:
+            last_error = exc
             attempt += 1
             if attempt >= _MAX_RETRY_ATTEMPTS:
-                raise
+                break
             time.sleep(backoff)
             backoff *= _BACKOFF_MULTIPLIER
     duration_seconds = perf_counter() - start_time
@@ -57,6 +59,16 @@ def run_agent(query: str) -> Dict[str, Any]:
     if hasattr(executor, "get_used_tools"):
         tools_used = getattr(executor, "get_used_tools")()
 
+    if result is None and last_error is not None:
+        return _normalize_response(
+            {},
+            input_query=normalized_query,
+            duration_seconds=duration_seconds,
+            tools_used=tools_used,
+            error=_build_error_payload(last_error),
+        )
+
+    assert result is not None  # for type checkers
     return _normalize_response(result, input_query=normalized_query, duration_seconds=duration_seconds, tools_used=tools_used)
 
 
@@ -65,6 +77,7 @@ def _normalize_response(
     input_query: str = "",
     duration_seconds: float | None = None,
     tools_used: Sequence[str] | None = None,
+    error: Mapping[str, Any] | None = None,
 ) -> Dict[str, Any]:
     """Normalize the raw agent output into the project JSON schema."""
 
@@ -100,12 +113,25 @@ def _normalize_response(
     pain_points = raw_result.get("pain_points", []) if isinstance(raw_result, Mapping) else []
     pain_points = pain_points if isinstance(pain_points, list) else []
 
+    normalized_error: Dict[str, Any] | None = None
+    if error:
+        remediation = error.get("remediation", []) if isinstance(error, Mapping) else []
+        remediation_list = [tip for tip in remediation if isinstance(tip, str) and tip.strip()]
+        normalized_error = {
+            "message": str(error.get("message", "Unexpected error occurred.")),
+            "type": str(error.get("type", "")),
+            "remediation": remediation_list or _default_remediation(),
+        }
+
     normalized_query = input_query or (raw_result.get("query", "") if isinstance(raw_result, Mapping) else "")
-    return {
+    response: Dict[str, Any] = {
         "query": normalized_query,
         "pain_points": pain_points,
         "metadata": normalized_metadata,
     }
+    if normalized_error:
+        response["error"] = normalized_error
+    return response
 
 
 def stream_agent(query: str) -> List[Any]:
@@ -127,3 +153,23 @@ def _validate_query(query: str) -> str:
 
     validate_query_length(normalized, min_words=1, max_words=50)
     return normalized
+
+
+def _build_error_payload(error: Exception) -> Dict[str, Any]:
+    """Construct a structured error payload with remediation suggestions."""
+
+    return {
+        "message": str(error),
+        "type": error.__class__.__name__,
+        "remediation": _default_remediation(),
+    }
+
+
+def _default_remediation() -> List[str]:
+    """Default remediation tips for agent failures."""
+
+    return [
+        "Rephrase the query with 3-10 words and try again.",
+        "Verify API credentials and rate limits for connected data sources.",
+        "Wait a moment and retry in case of transient service issues.",
+    ]

@@ -199,7 +199,7 @@ def test_run_agent_retries_transient_failure(monkeypatch: pytest.MonkeyPatch) ->
 
 
 def test_run_agent_stops_after_max_retries(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Persistent failures should surface after retries are exhausted."""
+    """Persistent failures should return a structured error payload after retries."""
 
     class AlwaysFailExecutor:
         def __init__(self) -> None:
@@ -215,11 +215,12 @@ def test_run_agent_stops_after_max_retries(monkeypatch: pytest.MonkeyPatch) -> N
     sleeps: list[float] = []
     monkeypatch.setattr(pain_point_agent.time, "sleep", lambda seconds: sleeps.append(seconds))
 
-    with pytest.raises(RuntimeError, match="boom"):
-        pain_point_agent.run_agent("will fail")
+    result = pain_point_agent.run_agent("will fail")
 
     assert executor.invocations == 3
     assert sleeps == [1.0, 2.0]
+    assert result["error"]["type"] == "RuntimeError"
+    assert result["error"]["remediation"]
 
 
 def test_run_agent_rejects_invalid_query() -> None:
@@ -273,7 +274,7 @@ def test_run_agent_merges_telemetry_tools(monkeypatch: pytest.MonkeyPatch) -> No
 
 
 def test_agent_error_handling(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Simulate tool failure and ensure agent surfaces a friendly error."""
+    """Simulate tool failure and ensure agent surfaces a structured error."""
 
     class FailingExecutor:
         def invoke(self, payload: dict[str, Any]) -> dict[str, Any]:
@@ -281,8 +282,11 @@ def test_agent_error_handling(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr(pain_point_agent, "create_agent", lambda: FailingExecutor())
 
-    with pytest.raises(RuntimeError, match="tool boom"):
-        pain_point_agent.run_agent("failure-query")
+    result = pain_point_agent.run_agent("failure-query")
+    error = result["error"]
+    assert "tool boom" in error["message"]
+    assert error["type"] == "RuntimeError"
+    assert error["remediation"]
 
 
 def test_tool_toggles(monkeypatch: pytest.MonkeyPatch) -> None:
