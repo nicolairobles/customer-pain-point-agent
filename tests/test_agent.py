@@ -8,7 +8,7 @@ from typing import Any
 
 import pytest
 
-from config.settings import AgentSettings, Settings
+from config.settings import AgentSettings, Settings, ToolSettings
 from src.agent import orchestrator, pain_point_agent
 
 
@@ -175,3 +175,41 @@ def test_agent_error_handling(monkeypatch: pytest.MonkeyPatch) -> None:
 
     with pytest.raises(RuntimeError, match="tool boom"):
         pain_point_agent.run_agent("failure-query")
+
+
+def test_tool_toggles(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Ensure tool enable flags control registry output."""
+
+    import types
+
+    class BaseDummyTool:
+        description = "dummy"
+
+        def __init__(self, name: str) -> None:
+            self.name = name
+
+        @classmethod
+        def from_settings(cls, _settings):
+            return cls(cls.name)  # type: ignore[attr-defined]
+
+    class DummyRedditTool(BaseDummyTool):
+        name = "reddit"
+
+    class DummyTwitterTool(BaseDummyTool):
+        name = "twitter"
+
+    class DummyGoogleSearchTool(BaseDummyTool):
+        name = "google"
+
+    monkeypatch.setitem(sys.modules, "src.tools.reddit_tool", types.SimpleNamespace(RedditTool=DummyRedditTool))
+    monkeypatch.setitem(sys.modules, "src.tools.twitter_tool", types.SimpleNamespace(TwitterTool=DummyTwitterTool))
+    monkeypatch.setitem(
+        sys.modules, "src.tools.google_search_tool", types.SimpleNamespace(GoogleSearchTool=DummyGoogleSearchTool)
+    )
+
+    settings = Settings(tools=ToolSettings(reddit_enabled=False, twitter_enabled=True, google_search_enabled=True))
+    tools = list(orchestrator._load_tools(settings))
+
+    names = [t.name for t in tools]
+    assert "reddit" not in names
+    assert names == ["twitter", "google"]

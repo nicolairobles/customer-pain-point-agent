@@ -76,9 +76,21 @@ def _iter_tools(settings: Settings) -> Iterable[Any]:
     from src.tools.twitter_tool import TwitterTool
     from src.tools.google_search_tool import GoogleSearchTool
 
-    yield RedditTool.from_settings(settings)
-    yield TwitterTool.from_settings(settings)
-    yield GoogleSearchTool.from_settings(settings)
+    tool_settings = getattr(settings, "tools", None)
+
+    def is_enabled(flag: str) -> bool:
+        if tool_settings is None:
+            return True
+        return getattr(tool_settings, flag, True)
+
+    if is_enabled("reddit_enabled"):
+        yield RedditTool.from_settings(settings)
+
+    if is_enabled("twitter_enabled"):
+        yield TwitterTool.from_settings(settings)
+
+    if is_enabled("google_search_enabled"):
+        yield GoogleSearchTool.from_settings(settings)
 
 
 def _build_llm(settings: Settings) -> Any:

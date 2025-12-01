@@ -57,6 +57,15 @@ class LLMSettings:
 
 
 @dataclass(frozen=True)
+class ToolSettings:
+    """Feature flags for enabling/disabling individual tools."""
+
+    reddit_enabled: bool = os.getenv("TOOL_REDDIT_ENABLED", "true").lower() == "true"
+    twitter_enabled: bool = os.getenv("TOOL_TWITTER_ENABLED", "true").lower() == "true"
+    google_search_enabled: bool = os.getenv("TOOL_GOOGLE_SEARCH_ENABLED", "true").lower() == "true"
+
+
+@dataclass(frozen=True)
 class Settings:
     """Aggregated application settings exposed to the rest of the codebase."""
 
@@ -64,6 +73,7 @@ class Settings:
     agent: AgentSettings = AgentSettings()
     budget: BudgetSettings = BudgetSettings()
     llm: LLMSettings = LLMSettings()
+    tools: ToolSettings = ToolSettings()
 
 
 settings = Settings()
