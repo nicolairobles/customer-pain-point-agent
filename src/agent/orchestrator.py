@@ -59,7 +59,7 @@ def build_agent_executor(settings: Settings) -> Any:
 
     instrumented_tools = _attach_telemetry(tools, telemetry_handler)
     agent_graph = create_react_agent(llm=llm, tools=instrumented_tools, prompt=prompt)
-    return _AgentRunner(agent_graph, settings)
+    return _AgentRunner(agent_graph, settings, telemetry_handler)
 
 
 def _load_tools(settings: Settings) -> List[Any]:
@@ -148,15 +148,25 @@ def _build_llm(settings: Settings) -> Any:
 class _AgentRunner:
     """Lightweight adapter exposing invoke/stream on the LangGraph agent."""
 
-    def __init__(self, agent_graph: Any, settings: Settings) -> None:
+    def __init__(self, agent_graph: Any, settings: Settings, telemetry_handler: Any | None = None) -> None:
         self._agent = agent_graph
         self._recursion_limit = max(1, settings.agent.max_iterations)
+        self._telemetry_handler = telemetry_handler
 
     def invoke(self, payload: Dict[str, Any]) -> Any:
         return self._agent.invoke(payload, config={"recursion_limit": self._recursion_limit})
 
     def stream(self, payload: Dict[str, Any]):
         yield from self._agent.stream(payload, config={"recursion_limit": self._recursion_limit})
+
+    def get_used_tools(self) -> List[str]:
+        """Return a unique list of tool names observed via telemetry."""
+
+        handler = self._telemetry_handler
+        used = getattr(handler, "used_tools", None)
+        if not used:
+            return []
+        return sorted({str(name) for name in used if name})
 
 
 def _attach_telemetry(tools: Iterable[Any], handler: Any) -> List[Any]:
@@ -182,11 +192,14 @@ class _TelemetryCallbackHandler:
         import logging
 
         self._log = logging.getLogger(__name__)
+        self.used_tools: set[str] = set()
 
     def on_tool_start(self, serialized: Dict[str, Any] | None = None, input_str: str | None = None, **kwargs: Any) -> None:
         tool_name = (serialized or {}).get("name", "<unknown>")
         summary = _summarize_input(input_str)
         self._log.info("tool_start name=%s input=%s", tool_name, summary)
+        if tool_name and tool_name != "<unknown>":
+            self.used_tools.add(str(tool_name))
 
     def on_tool_end(self, output: Any, **kwargs: Any) -> None:
         self._log.info("tool_end output_type=%s", type(output).__name__)

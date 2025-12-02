@@ -10,6 +10,7 @@ import pytest
 
 from config.settings import AgentSettings, Settings, ToolSettings
 from src.agent import orchestrator, pain_point_agent
+from src.utils.validators import ValidationError
 
 
 def test_normalize_response_structure() -> None:
@@ -167,8 +168,175 @@ def test_run_agent_smoke(monkeypatch: pytest.MonkeyPatch) -> None:
     assert result["metadata"]["total_sources_searched"] == 3
 
 
+def test_run_agent_retries_transient_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Transient failures should be retried with exponential backoff."""
+
+    class FlakyExecutor:
+        def __init__(self) -> None:
+            self.invocations = 0
+
+        def invoke(self, payload: dict[str, Any]) -> dict[str, Any]:
+            self.invocations += 1
+            if self.invocations == 1:
+                raise RuntimeError("transient")
+            return {
+                "query": payload.get("input", ""),
+                "pain_points": [{"text": "ok"}],
+                "metadata": {"total_sources_searched": 1, "execution_time": 0.01, "api_costs": 0.0},
+            }
+
+    executor = FlakyExecutor()
+    monkeypatch.setattr(pain_point_agent, "create_agent", lambda: executor)
+
+    sleeps: list[float] = []
+    monkeypatch.setattr(pain_point_agent.time, "sleep", lambda seconds: sleeps.append(seconds))
+
+    result = pain_point_agent.run_agent("transient test")
+
+    assert executor.invocations == 2
+    assert sleeps == [1.0]
+    assert result["metadata"]["total_sources_searched"] == 1
+
+
+def test_run_agent_stops_after_max_retries(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Persistent failures should return a structured error payload after retries."""
+
+    class AlwaysFailExecutor:
+        def __init__(self) -> None:
+            self.invocations = 0
+
+        def invoke(self, payload: dict[str, Any]) -> dict[str, Any]:
+            self.invocations += 1
+            raise RuntimeError("boom")
+
+    executor = AlwaysFailExecutor()
+    monkeypatch.setattr(pain_point_agent, "create_agent", lambda: executor)
+
+    sleeps: list[float] = []
+    monkeypatch.setattr(pain_point_agent.time, "sleep", lambda seconds: sleeps.append(seconds))
+
+    result = pain_point_agent.run_agent("will fail")
+
+    assert executor.invocations == 3
+    assert sleeps == [1.0, 2.0]
+    assert result["error"]["type"] == "RuntimeError"
+    assert result["error"]["remediation"]
+
+
+def test_run_agent_rejects_invalid_query() -> None:
+    """Input validation should block empty or non-string queries before invocation."""
+
+    with pytest.raises(ValidationError):
+        pain_point_agent.run_agent("")  # type: ignore[arg-type]
+
+    with pytest.raises(ValidationError):
+        pain_point_agent.run_agent("   ")
+
+    with pytest.raises(ValidationError):
+        pain_point_agent.run_agent(None)  # type: ignore[arg-type]
+
+
+def test_run_agent_rejects_overlong_query() -> None:
+    """Queries exceeding max words should raise validation error."""
+
+    long_query = " ".join(["word"] * 51)
+
+    with pytest.raises(ValidationError):
+        pain_point_agent.run_agent(long_query)
+
+
+def test_run_agent_normalizes_missing_fields(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Normalization should backfill defaults when the agent omits fields."""
+
+    class PartialExecutor:
+        def invoke(self, payload: dict[str, Any]) -> dict[str, Any]:
+            return {"metadata": {"execution_time": 1.5}}
+
+    monkeypatch.setattr(pain_point_agent, "create_agent", lambda: PartialExecutor())
+
+    result = pain_point_agent.run_agent("singleword")
+
+    assert result["query"] == "singleword"
+    assert result["pain_points"] == []
+    assert result["metadata"]["execution_time"] >= 0.0
+    assert result["metadata"]["total_sources_searched"] == 0
+    assert result["metadata"]["api_costs"] == 0.0
+    assert result["metadata"]["tools_used"] == []
+
+
+def test_run_agent_merges_telemetry_tools(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Tools observed via telemetry should be surfaced in metadata."""
+
+    class ToolAwareExecutor:
+        def invoke(self, payload: dict[str, Any]) -> dict[str, Any]:
+            return {"metadata": {"tools_used": ["metadata_tool"]}}
+
+        def get_used_tools(self) -> list[str]:
+            return ["reddit", "Twitter", "reddit"]
+
+    monkeypatch.setattr(pain_point_agent, "create_agent", lambda: ToolAwareExecutor())
+
+    result = pain_point_agent.run_agent("tool merge")
+
+    tools = result["metadata"]["tools_used"]
+    assert set(tools) == {"reddit", "twitter", "metadata_tool"}
+
+
+def test_stream_agent_yields_events(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Streamed events should be yielded progressively with a completion summary."""
+
+    class StreamingExecutor:
+        def __init__(self) -> None:
+            self.payloads: list[dict[str, Any]] = []
+
+        def stream(self, payload: dict[str, Any]):
+            self.payloads.append(payload)
+            yield {"event": "chunk", "data": 1}
+            yield {"event": "chunk", "data": 2}
+
+    executor = StreamingExecutor()
+    monkeypatch.setattr(pain_point_agent, "create_agent", lambda: executor)
+
+    events = list(pain_point_agent.stream_agent("stream query"))
+
+    assert executor.payloads[0]["input"] == "stream query"
+    assert events[0]["event"] == "chunk"
+    assert events[1]["event"] == "chunk"
+    assert events[-1]["event"] == "complete"
+    assert "execution_time" in events[-1]["metadata"]
+    assert events[-1]["metadata"]["tools_used"] == []
+
+
+def test_stream_agent_surfaces_errors(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Streaming failures should emit a structured error event instead of raising."""
+
+    class FailingStreamExecutor:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def stream(self, payload: dict[str, Any]):
+            self.calls += 1
+            raise RuntimeError("stream failure")
+
+        def get_used_tools(self) -> list[str]:
+            return ["stream_tool"]
+
+    executor = FailingStreamExecutor()
+    monkeypatch.setattr(pain_point_agent, "create_agent", lambda: executor)
+
+    events = list(pain_point_agent.stream_agent("stream failure"))
+
+    assert executor.calls == 1
+    assert len(events) == 1
+    error_event = events[0]
+    assert error_event["event"] == "error"
+    assert error_event["error"]["type"] == "RuntimeError"
+    assert "execution_time" in error_event["metadata"]
+    assert error_event["metadata"]["tools_used"] == ["stream_tool"]
+
+
 def test_agent_error_handling(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Simulate tool failure and ensure agent surfaces a friendly error."""
+    """Simulate tool failure and ensure agent surfaces a structured error."""
 
     class FailingExecutor:
         def invoke(self, payload: dict[str, Any]) -> dict[str, Any]:
@@ -176,8 +344,11 @@ def test_agent_error_handling(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr(pain_point_agent, "create_agent", lambda: FailingExecutor())
 
-    with pytest.raises(RuntimeError, match="tool boom"):
-        pain_point_agent.run_agent("failure-query")
+    result = pain_point_agent.run_agent("failure-query")
+    error = result["error"]
+    assert "tool boom" in error["message"]
+    assert error["type"] == "RuntimeError"
+    assert error["remediation"]
 
 
 def test_tool_toggles(monkeypatch: pytest.MonkeyPatch) -> None:
