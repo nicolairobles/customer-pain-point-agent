@@ -256,6 +256,8 @@ class RedditTool(BaseTool):
         subreddits = subreddits or ["all"]
         total_limit = max(1, min(int(limit), 20))
         per_subreddit = max(1, min(int(per_subreddit), 25))
+        # PRAW rejects None; default to a conservative window if not provided.
+        time_filter = time_filter or "week"
 
         start = time.time()
         results_by_sub: List[List[Dict[str, Any]]] = []
