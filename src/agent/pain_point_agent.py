@@ -35,12 +35,11 @@ def run_agent(query: str) -> Dict[str, Any]:
     normalized_query = _validate_query(query)
     executor = create_agent()
 
-    attempt = 0
     backoff = _INITIAL_BACKOFF_SECONDS
     start_time = perf_counter()
     result: Mapping[str, Any] | Dict[str, Any] | None = None
     last_error: Exception | None = None
-    while True:
+    for attempt in range(_MAX_RETRY_ATTEMPTS):
         try:
             result = executor.invoke({"input": normalized_query})
             break
@@ -48,11 +47,9 @@ def run_agent(query: str) -> Dict[str, Any]:
             raise
         except Exception as exc:
             last_error = exc
-            attempt += 1
-            if attempt >= _MAX_RETRY_ATTEMPTS:
-                break
-            time.sleep(backoff)
-            backoff *= _BACKOFF_MULTIPLIER
+            if attempt < _MAX_RETRY_ATTEMPTS - 1:
+                time.sleep(backoff)
+                backoff *= _BACKOFF_MULTIPLIER
     duration_seconds = perf_counter() - start_time
 
     tools_used: Sequence[str] = []
@@ -83,7 +80,6 @@ def _normalize_response(
 
     metadata_defaults: Dict[str, Any] = {
         "total_sources_searched": 0,
-        "execution_time": duration_seconds if duration_seconds is not None else 0.0,
         "api_costs": 0.0,
         "tools_used": list(tools_used or []),
     }
@@ -92,8 +88,9 @@ def _normalize_response(
     if isinstance(metadata, Mapping):
         normalized_metadata.update(metadata)
 
-    if duration_seconds is not None:
-        normalized_metadata["execution_time"] = duration_seconds
+    normalized_metadata["execution_time"] = duration_seconds if duration_seconds is not None else float(
+        normalized_metadata.get("execution_time", 0.0)
+    )
 
     tools: List[str] = []
     seen_tools: set[str] = set()
@@ -107,7 +104,7 @@ def _normalize_response(
         if lower in seen_tools:
             continue
         seen_tools.add(lower)
-        tools.append(cleaned)
+        tools.append(lower)
     normalized_metadata["tools_used"] = tools
 
     pain_points = raw_result.get("pain_points", []) if isinstance(raw_result, Mapping) else []
@@ -140,31 +137,28 @@ def stream_agent(query: str) -> Iterable[Any]:
     normalized_query = _validate_query(query)
     executor = create_agent()
 
-    def _generator() -> Iterable[Any]:
-        start_time = perf_counter()
-        try:
-            for event in executor.stream({"input": normalized_query}):
-                yield event
-            duration = perf_counter() - start_time
-            tools_used: Sequence[str] = []
-            if hasattr(executor, "get_used_tools"):
-                tools_used = getattr(executor, "get_used_tools")()
-            summary = _normalize_response({}, input_query=normalized_query, duration_seconds=duration, tools_used=tools_used)
-            yield {"event": "complete", "metadata": summary["metadata"], "query": normalized_query}
-        except ValidationError:
-            raise
-        except Exception as exc:
-            duration = perf_counter() - start_time
-            tools_used = getattr(executor, "get_used_tools")() if hasattr(executor, "get_used_tools") else []
-            summary = _normalize_response({}, input_query=normalized_query, duration_seconds=duration, tools_used=tools_used)
-            yield {
-                "event": "error",
-                "query": normalized_query,
-                "error": _build_error_payload(exc),
-                "metadata": summary["metadata"],
-            }
-
-    return _generator()
+    start_time = perf_counter()
+    try:
+        for event in executor.stream({"input": normalized_query}):
+            yield event
+        duration = perf_counter() - start_time
+        tools_used: Sequence[str] = []
+        if hasattr(executor, "get_used_tools"):
+            tools_used = getattr(executor, "get_used_tools")()
+        summary = _normalize_response({}, input_query=normalized_query, duration_seconds=duration, tools_used=tools_used)
+        yield {"event": "complete", "metadata": summary["metadata"], "query": normalized_query}
+    except ValidationError:
+        raise
+    except Exception as exc:
+        duration = perf_counter() - start_time
+        tools_used = getattr(executor, "get_used_tools")() if hasattr(executor, "get_used_tools") else []
+        summary = _normalize_response({}, input_query=normalized_query, duration_seconds=duration, tools_used=tools_used)
+        yield {
+            "event": "error",
+            "query": normalized_query,
+            "error": _build_error_payload(exc),
+            "metadata": summary["metadata"],
+        }
 
 
 def _validate_query(query: str) -> str:
@@ -195,7 +189,7 @@ def _default_remediation() -> List[str]:
     """Default remediation tips for agent failures."""
 
     return [
-        "Rephrase the query with 3-10 words and try again.",
+        "Rephrase the query to be between 1 and 50 words (3-10 words recommended for best results) and try again.",
         "Verify API credentials and rate limits for connected data sources.",
         "Wait a moment and retry in case of transient service issues.",
     ]

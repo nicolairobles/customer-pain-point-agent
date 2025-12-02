@@ -236,6 +236,15 @@ def test_run_agent_rejects_invalid_query() -> None:
         pain_point_agent.run_agent(None)  # type: ignore[arg-type]
 
 
+def test_run_agent_rejects_overlong_query() -> None:
+    """Queries exceeding max words should raise validation error."""
+
+    long_query = " ".join(["word"] * 51)
+
+    with pytest.raises(ValidationError):
+        pain_point_agent.run_agent(long_query)
+
+
 def test_run_agent_normalizes_missing_fields(monkeypatch: pytest.MonkeyPatch) -> None:
     """Normalization should backfill defaults when the agent omits fields."""
 
@@ -270,7 +279,7 @@ def test_run_agent_merges_telemetry_tools(monkeypatch: pytest.MonkeyPatch) -> No
     result = pain_point_agent.run_agent("tool merge")
 
     tools = result["metadata"]["tools_used"]
-    assert set(tools) == {"reddit", "Twitter", "metadata_tool"}
+    assert set(tools) == {"reddit", "twitter", "metadata_tool"}
 
 
 def test_stream_agent_yields_events(monkeypatch: pytest.MonkeyPatch) -> None:

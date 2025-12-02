@@ -198,7 +198,7 @@ class _TelemetryCallbackHandler:
         tool_name = (serialized or {}).get("name", "<unknown>")
         summary = _summarize_input(input_str)
         self._log.info("tool_start name=%s input=%s", tool_name, summary)
-        if tool_name:
+        if tool_name and tool_name != "<unknown>":
             self.used_tools.add(str(tool_name))
 
     def on_tool_end(self, output: Any, **kwargs: Any) -> None:
