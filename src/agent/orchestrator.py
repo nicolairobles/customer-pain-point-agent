@@ -4,6 +4,14 @@ from __future__ import annotations
 
 from typing import Any, Dict, Iterable, List
 
+try:
+    from langchain_core.callbacks.base import BaseCallbackHandler  # type: ignore
+except Exception:  # pragma: no cover - fallback for environments without langchain
+    class BaseCallbackHandler:  # type: ignore
+        """Minimal shim used when langchain callbacks are unavailable."""
+
+        pass
+
 from config.settings import Settings
 
 
@@ -18,9 +26,14 @@ def build_agent_executor(settings: Settings) -> Any:
 
     try:
         import langchain as _langchain
-        from langchain.agents import create_react_agent  # type: ignore
         from langchain_core.callbacks.base import BaseCallbackHandler  # type: ignore
-        from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder  # type: ignore
+
+        try:
+            # Preferred location (langchain>=0.3)
+            from langchain.agents import create_react_agent  # type: ignore
+        except Exception:
+            # Fallback for installations that still expose the helper via langgraph.prebuilt
+            from langgraph.prebuilt import create_react_agent  # type: ignore
     except Exception as exc:  # pragma: no cover - environment specific
         raise ImportError(
             "Failed to import required classes from langchain. This can happen if the package is not "
@@ -49,16 +62,15 @@ def build_agent_executor(settings: Settings) -> Any:
     llm = _build_llm(settings)
     telemetry_handler = _TelemetryCallbackHandler()
 
-    prompt = ChatPromptTemplate.from_messages(
-        [
-            ("system", "You are a helpful assistant that researches customer pain points using the provided tools."),
-            ("human", "{input}"),
-            MessagesPlaceholder("agent_scratchpad"),
-        ]
-    )
+    system_prompt = "You are a helpful assistant that researches customer pain points using the provided tools."
 
     instrumented_tools = _attach_telemetry(tools, telemetry_handler)
-    agent_graph = create_react_agent(llm=llm, tools=instrumented_tools, prompt=prompt)
+
+    try:
+        agent_graph = create_react_agent(model=llm, tools=instrumented_tools, prompt=system_prompt)
+    except TypeError:
+        # Backward compatibility for older signatures that expect `llm` instead of `model`.
+        agent_graph = create_react_agent(llm=llm, tools=instrumented_tools, prompt=system_prompt)
     return _AgentRunner(agent_graph, settings, telemetry_handler)
 
 
@@ -97,52 +109,26 @@ def _iter_tools(settings: Settings) -> Iterable[Any]:
 
 
 def _build_llm(settings: Settings) -> Any:
-    """Instantiate an LLM backed by the OpenAIService wrapper (settings-driven)."""
+    """Instantiate a chat model that is compatible with LangChain tool binding."""
 
     try:
-        from langchain_core.language_models.llms import LLM  # type: ignore
+        from langchain_openai import ChatOpenAI  # type: ignore
     except Exception as exc:  # pragma: no cover - environment specific
         raise ImportError(
-            "LangChain LLM base class not available. Confirm `langchain` satisfies project constraints."
+            "ChatOpenAI is not available. Install the `langchain-openai` package to enable agent execution."
         ) from exc
 
-    from src.services import OpenAIService
+    llm_settings = settings.llm
+    api_settings = settings.api
 
-    class OpenAIServiceLLM(LLM):
-        """Adapter to make OpenAIService compatible with LangChain agents."""
-
-        def __init__(self, service: OpenAIService):
-            super().__init__()
-            self._service = service
-            self._settings = service_settings
-
-        @property
-        def _llm_type(self) -> str:
-            return "openai-service"
-
-        @property
-        def _identifying_params(self) -> Dict[str, Any]:
-            llm_settings = self._settings
-            return {
-                "model": llm_settings.model,
-                "temperature": llm_settings.temperature,
-                "max_output_tokens": llm_settings.max_output_tokens,
-            }
-
-        def _call(self, prompt: str, stop: List[str] | None = None, run_manager: Any = None, **kwargs: Any) -> str:
-            # OpenAIService does not currently accept stop tokens; emulate simple stop behavior locally.
-            result = self._service.generate(prompt)
-            text = result.text
-            if stop:
-                for token in stop:
-                    if token in text:
-                        text = text.split(token)[0]
-                        break
-            return text
-
-    service_settings = settings.llm
-    service = OpenAIService.from_settings(settings)
-    return OpenAIServiceLLM(service)
+    return ChatOpenAI(
+        api_key=getattr(api_settings, "openai_api_key", ""),
+        model=llm_settings.model,
+        temperature=llm_settings.temperature,
+        max_tokens=llm_settings.max_output_tokens,
+        timeout=llm_settings.request_timeout_seconds,
+        max_retries=llm_settings.max_retry_attempts,
+    )
 
 
 class _AgentRunner:
@@ -185,8 +171,11 @@ def _attach_telemetry(tools: Iterable[Any], handler: Any) -> List[Any]:
     return instrumented
 
 
-class _TelemetryCallbackHandler:
+class _TelemetryCallbackHandler(BaseCallbackHandler):
     """Lightweight logger for tool invocation events (non-sensitive)."""
+
+    ignore_agent = False
+    raise_error = False
 
     def __init__(self) -> None:
         import logging
