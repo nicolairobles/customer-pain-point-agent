@@ -26,7 +26,6 @@ def build_agent_executor(settings: Settings) -> Any:
 
     try:
         import langchain as _langchain
-        from langchain_core.callbacks.base import BaseCallbackHandler  # type: ignore
 
         try:
             # Preferred location (langchain>=0.3)
@@ -122,7 +121,7 @@ def _build_llm(settings: Settings) -> Any:
     api_settings = settings.api
 
     return ChatOpenAI(
-        api_key=getattr(api_settings, "openai_api_key", ""),
+        api_key=api_settings.openai_api_key,
         model=llm_settings.model,
         temperature=llm_settings.temperature,
         max_tokens=llm_settings.max_output_tokens,

@@ -57,9 +57,10 @@ def _install_fake_langchain(monkeypatch: pytest.MonkeyPatch, call_log: dict[str,
             yield {"event": "start", "payload": payload}
             yield {"event": "end"}
 
-    def fake_create_react_agent(llm=None, tools=None, prompt=None):
-        call_log.update({"tools": tools, "llm": llm, "prompt": prompt})
-        return FakeReactAgent(llm=llm, tools=tools, prompt=prompt)
+    def fake_create_react_agent(llm=None, model=None, tools=None, prompt=None):
+        resolved_llm = llm or model
+        call_log.update({"tools": tools, "llm": resolved_llm, "model": model, "prompt": prompt})
+        return FakeReactAgent(llm=resolved_llm, tools=tools, prompt=prompt)
 
     class FakeChatPromptTemplate:
         def __init__(self, messages):
