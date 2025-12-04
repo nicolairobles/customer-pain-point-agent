@@ -58,6 +58,12 @@ def _install_fake_langchain(monkeypatch: pytest.MonkeyPatch, call_log: dict[str,
             yield {"event": "end"}
 
     def fake_create_react_agent(llm=None, model=None, tools=None, prompt=None):
+        # Simulate older LangChain signature that rejects the newer `model` kwarg so we exercise the
+        # fallback path in orchestrator.build_agent_executor.
+        if model is not None:
+            call_log["model_attempted"] = True
+            raise TypeError("create_react_agent() got an unexpected keyword argument 'model'")
+
         resolved_llm = llm or model
         call_log.update({"tools": tools, "llm": resolved_llm, "model": model, "prompt": prompt})
         return FakeReactAgent(llm=resolved_llm, tools=tools, prompt=prompt)
@@ -117,6 +123,7 @@ def test_build_agent_executor_invokes_initialize_agent(monkeypatch: pytest.Monke
     result = executor.invoke({"input": "hello"})
     assert result["tools"] == ["dummy_tool"]
     assert result["recursion_limit"] == 3
+    assert call_log["model_attempted"] is True
     assert call_log["prompt"]
     assert call_log["tools"] == [dummy_tool]
     assert call_log["llm"]._llm_type == "dummy"
