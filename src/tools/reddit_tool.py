@@ -29,26 +29,29 @@ from src.tools.reddit_parser import normalize_submission
 class RedditToolInput(BaseModel):
     """Input schema for RedditTool."""
 
-    query: str = Field(..., description="Search query to run against Reddit.")
+    query: str = Field(
+        ..., 
+        description="The exact search terms from the user's question. Pass the user's query directly without modification."
+    )
     subreddits: List[str] = Field(
-        default_factory=lambda: ["all"],
-        description="One or more subreddit names to search (defaults to 'all').",
+        default_factory=lambda: ["smallbusiness", "Entrepreneur", "startups", "CustomerService"],
+        description="One or more subreddit names to search. Prefer specific subreddits over 'all' to avoid rate limits.",
     )
     limit: int = Field(
-        15,
+        10,
         ge=1,
         le=20,
         description="Total number of posts to return across subreddits (capped at 20).",
     )
     per_subreddit: int = Field(
-        10,
+        5,
         ge=1,
         le=25,
         description="Posts to fetch per subreddit before merging and deduping.",
     )
     time_filter: Optional[Literal["hour", "day", "week", "month", "year", "all"]] = Field(
-        None,
-        description="Optional Reddit time filter window.",
+        "month",
+        description="Reddit time filter window. Defaults to 'month' for relevant recent content.",
     )
 
     model_config = ConfigDict(extra="forbid")
@@ -74,7 +77,11 @@ class RedditTool(BaseTool):
     """
 
     name: str = "reddit_search"
-    description: str = "Search Reddit for discussions related to customer pain points."
+    description: str = (
+        "Search Reddit for posts matching a specific query. "
+        "The 'query' parameter MUST be the user's actual search terms - pass them exactly as provided. "
+        "Returns posts with title, body, author, subreddit, and engagement metrics."
+    )
     args_schema: type[BaseModel] = RedditToolInput
 
     settings: Any = None
@@ -91,12 +98,15 @@ class RedditTool(BaseTool):
         if not client_id or not client_secret:
             _LOG.warning("Reddit credentials not provided in settings; client will still be created but may fail on use.")
 
-        # Initialize PRAW Reddit client
+        # Initialize PRAW Reddit client with timeout and rate limit settings
+        # to prevent connection exhaustion during rapid agent calls
         self._client = praw.Reddit(
             client_id=client_id or "",
             client_secret=client_secret or "",
             user_agent=user_agent,
             check_for_async=False,
+            timeout=30,  # Request timeout in seconds
+            ratelimit_seconds=300,  # Wait up to 5 min if rate limited
         )
 
     @classmethod
@@ -178,8 +188,13 @@ class RedditTool(BaseTool):
         """Fetch search results for a single subreddit with simple retry/backoff."""
 
         attempt = 0
-        backoff = 0.5
+        # Start with a longer backoff to respect Reddit rate limits
+        # This helps avoid connection exhaustion during rapid agent calls
+        backoff = 3.0
         while attempt <= retries:
+            # Small delay before each attempt to avoid overwhelming Reddit
+            if attempt > 0:
+                _LOG.debug("Waiting %.1fs before retry attempt %d for r/%s", backoff, attempt + 1, subreddit_name)
             try:
                 subreddit = self._client.subreddit(subreddit_name)
                 # Measure fetch duration to help detect slow or rate-limited calls.
@@ -213,7 +228,7 @@ class RedditTool(BaseTool):
                     break
 
                 time.sleep(backoff)
-                backoff *= 2
+                backoff *= 2  # Exponential backoff: 2s -> 4s -> 8s
 
         _LOG.error("Failed to fetch subreddit %s after %d attempts", subreddit_name, retries + 1)
         return []
@@ -247,13 +262,14 @@ class RedditTool(BaseTool):
         self,
         query: str,
         subreddits: Optional[List[str]] = None,
-        limit: int = 15,
-        per_subreddit: int = 10,
+        limit: int = 10,
+        per_subreddit: int = 5,
         time_filter: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """Synchronously execute the tool and return normalized search results."""
 
-        subreddits = subreddits or ["all"]
+        # Use specific subreddits by default to avoid rate limits on r/all
+        subreddits = subreddits or ["smallbusiness", "Entrepreneur", "startups", "CustomerService"]
         total_limit = max(1, min(int(limit), 20))
         per_subreddit = max(1, min(int(per_subreddit), 25))
         # PRAW rejects None; default to a conservative window if not provided.
@@ -263,7 +279,10 @@ class RedditTool(BaseTool):
         results_by_sub: List[List[Dict[str, Any]]] = []
 
         try:
-            with ThreadPoolExecutor(max_workers=min(8, len(subreddits))) as exc:
+            # Limit concurrent requests to avoid overwhelming Reddit's API
+            # and causing connection exhaustion / rate limiting
+            max_workers = min(2, len(subreddits))
+            with ThreadPoolExecutor(max_workers=max_workers) as exc:
                 futures = {exc.submit(self._fetch_subreddit, s, query, per_subreddit, time_filter): s for s in subreddits}
                 for fut in as_completed(futures):
                     try:
@@ -274,6 +293,17 @@ class RedditTool(BaseTool):
             merged = self._merge_and_sort(results_by_sub, total_limit)
             duration = time.time() - start
             _LOG.info("RedditTool: returning %d posts in %.2f seconds", len(merged), duration)
+            
+            # Log post titles for debugging/verification
+            if merged:
+                _LOG.info("RedditTool posts returned:")
+                for i, post in enumerate(merged[:5], 1):  # Log first 5 posts
+                    title = post.get("title", "")[:80]
+                    subreddit = post.get("subreddit", "unknown")
+                    _LOG.info("  %d. [r/%s] %s", i, subreddit, title)
+                if len(merged) > 5:
+                    _LOG.info("  ... and %d more posts", len(merged) - 5)
+            
             return merged
         except Exception as exc:
             _LOG.exception("RedditTool encountered an unexpected error: %s", exc)
