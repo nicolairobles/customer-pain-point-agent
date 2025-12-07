@@ -243,16 +243,29 @@ class RedditTool(BaseTool):
         return []
 
     def _check_relevance(self, post: Dict[str, Any], query: str) -> bool:
-        """Check if a post is relevant to the search query.
+        """Check if a post is relevant to the search query using weighted scoring.
         
-        A post is considered relevant if query terms appear in title or body.
-        This helps filter out posts that are just popular in the subreddit
-        but not related to the actual search query.
+        Uses a weighted scoring system:
+        - Generic terms (api, error, bug, etc.) get weight 1
+        - Specific/primary terms get weight 3
+        - Posts must score >= 3 (at least one primary term) to pass
+        
+        This prevents generic API posts from matching queries about specific APIs.
         """
         if not query or len(query) <= 2:
             # For very short or empty queries, accept all posts
             return True
-            
+        
+        # Generic terms that are common across many topics
+        GENERIC_TERMS = {
+            "api", "apis", "issue", "issues", "problem", "problems",
+            "error", "errors", "bug", "bugs", "help", "question",
+            "code", "coding", "dev", "developer", "developers",
+            "calling", "call", "use", "using", "used",
+            "pain", "point", "points", "report", "reports",
+            "when", "how", "what", "why", "the", "and", "for",
+        }
+        
         # Extract query terms (simple tokenization)
         query_lower = query.lower()
         query_terms = [term for term in query_lower.split() if len(term) > 2]
@@ -261,20 +274,45 @@ class RedditTool(BaseTool):
         if not query_terms:
             return True
         
+        # Separate primary (specific) and generic terms
+        primary_terms = [t for t in query_terms if t not in GENERIC_TERMS]
+        generic_terms = [t for t in query_terms if t in GENERIC_TERMS]
+        
         # Get post content
         title = (post.get("title") or "").lower()
-        # Note: normalize_submission() converts Reddit's 'selftext' to 'text' field
         text = (post.get("text") or "").lower()
         combined_text = f"{title} {text}"
         
-        # Check if any query term appears in the post
-        # Use a simple substring check for better matching
-        for term in query_terms:
-            if term in combined_text:
-                return True
+        # Calculate weighted score
+        score = 0
+        matched_primary = []
+        matched_generic = []
         
-        # If no terms match, it's not relevant
-        return False
+        for term in primary_terms:
+            if term in combined_text:
+                score += 3  # Primary terms are worth 3 points
+                matched_primary.append(term)
+        
+        for term in generic_terms:
+            if term in combined_text:
+                score += 1  # Generic terms are worth 1 point
+                matched_generic.append(term)
+        
+        # Require at least one primary term match (score >= 3)
+        # OR if there are no primary terms in query, require all generic terms
+        if primary_terms:
+            is_relevant = score >= 3  # At least one primary term matched
+        else:
+            # No primary terms in query - fall back to old behavior
+            is_relevant = score > 0
+        
+        if not is_relevant:
+            _LOG.debug(
+                "Relevance check failed for '%s': score=%d, primary=%s, generic=%s",
+                (post.get("title") or "")[:40], score, matched_primary, matched_generic
+            )
+        
+        return is_relevant
 
     def _merge_and_sort(self, lists: Iterable[List[Dict[str, Any]]], total_limit: int, query: str = "") -> List[Dict[str, Any]]:
         """Merge results from multiple subreddits, dedupe by `id`, filter by relevance, and sort.

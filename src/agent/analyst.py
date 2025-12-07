@@ -26,8 +26,8 @@ class Analyst:
                 api_key=settings.api.openai_api_key,
                 model=settings.llm.model,
                 temperature=0.3,  # Slight creativity for synthesis
-                max_tokens=settings.llm.max_output_tokens,
-                timeout=settings.llm.request_timeout_seconds,
+                timeout=60,  # Longer timeout for detailed responses
+                model_kwargs={"max_tokens": 8192},  # Force max_tokens via kwargs
             )
 
     def review(self, analysis: QueryAnalysis, research_output: str) -> str:
@@ -51,15 +51,23 @@ CONTEXT:
 - What we looked for: {analysis.context_notes}
 - The Raw Findings below were collected by a junior researcher.
 
-INSTRUCTIONS:
-1. Filter out irrelevant posts (spam, off-topic, or low quality).
-2. Group similar pain points together.
-3. Highlight specific examples from the findings (cite them if possible).
-4. Provide a direct answer to the user's query.
-5. If the findings are empty or irrelevant, honestly state that no strong evidence was found.
+CRITICAL FILTERING RULES:
+1. ONLY use posts that DIRECTLY mention "{analysis.refined_query.split()[0] if analysis.refined_query else 'the topic'}".
+2. DISCARD posts that discuss generic topics (e.g., "API issues" when we asked about "OpenAI API").
+3. If a post doesn't explicitly reference the specific product/service in the query, DO NOT cite it.
+4. Be STRICT - it's better to report fewer, highly relevant findings than many vague ones.
+
+SYNTHESIS INSTRUCTIONS:
+1. Group similar pain points together.
+2. Highlight specific examples from the findings (cite post titles).
+3. Provide a direct answer to the user's query.
+4. If most findings are off-topic, honestly state: "Limited relevant data found. The following insights are based on [X] directly relevant posts out of [Y] total."
 
 FORMAT:
-Return the final answer in clean Markdown. Use bullet points and sections.
+- Return the final answer in clean Markdown.
+- Be CONCISE: aim for 3-5 key pain points maximum.
+- Use bullet points, not long paragraphs.
+- ALWAYS end with a brief "Conclusion" section to ensure the report is complete.
 """
 
         messages = [
@@ -69,4 +77,19 @@ Return the final answer in clean Markdown. Use bullet points and sections.
 
         _LOG.info("Analyst running review on research output of length %d", len(research_output))
         response = self.llm.invoke(messages)
+        
+        # Log response metadata to diagnose truncation
+        if hasattr(response, 'response_metadata'):
+            metadata = response.response_metadata
+            finish_reason = metadata.get('finish_reason', 'unknown')
+            usage = metadata.get('usage', {}) or metadata.get('token_usage', {})
+            _LOG.info(
+                "Analyst LLM response: finish_reason=%s, completion_tokens=%s, total_tokens=%s",
+                finish_reason,
+                usage.get('completion_tokens', 'N/A'),
+                usage.get('total_tokens', 'N/A')
+            )
+            if finish_reason == 'length':
+                _LOG.warning("Response was truncated due to max_tokens limit!")
+        
         return response.content

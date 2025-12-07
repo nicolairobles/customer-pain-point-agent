@@ -295,12 +295,6 @@ CRITICAL:
 - Call search tools to get real data.
 """
 
-YOUR JOB:
-1. Search and COLLECT findings.
-2. Report everything found detailedly.
-3. Finish when you have gathered data.
-"""
-
         try:
             from langchain.agents import create_react_agent  # type: ignore
         except Exception:
