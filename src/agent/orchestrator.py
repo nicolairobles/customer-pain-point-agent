@@ -61,28 +61,15 @@ def build_agent_executor(settings: Settings) -> Any:
     llm = _build_llm(settings)
     telemetry_handler = _TelemetryCallbackHandler()
 
-    system_prompt = """You are a research assistant that finds discussions about topics users ask about.
-
-CRITICAL RULE FOR TOOL USAGE:
-When using the reddit_search tool, the 'query' parameter MUST be the user's actual question or topic.
-- If user asks about "issues with ecommerce billing" -> query="issues with ecommerce billing"
-- If user asks about "shipping delays complaints" -> query="shipping delays complaints"
-- DO NOT change the query to generic terms like "customer pain points"
-- DO NOT substitute or rephrase - use the user's EXACT words
-
-Subreddit Selection:
-Use well-known subreddits: smallbusiness, Entrepreneur, technology, personalfinance, AskReddit
-
-After searching, summarize the findings. Call the search tool only ONCE."""
-
-    instrumented_tools = _attach_telemetry(tools, telemetry_handler)
-
-    try:
-        agent_graph = create_react_agent(model=llm, tools=instrumented_tools, prompt=system_prompt)
-    except TypeError:
-        # Backward compatibility for older signatures that expect `llm` instead of `model`.
-        agent_graph = create_react_agent(llm=llm, tools=instrumented_tools, prompt=system_prompt)
-    return _AgentRunner(agent_graph, settings, telemetry_handler)
+    # We now return an _AgentRunner that orchestrates the QueryProcessor -> Agent flow
+    # Pass 'tools' and 'llm' so the runner can rebuild the agent per request with dynamic prompts.
+    return _AgentRunner(
+        agent_graph=None,  # Deprecated in this flow
+        settings=settings,
+        telemetry_handler=telemetry_handler,
+        tools=tools,
+        llm=llm
+    )
 
 
 def _load_tools(settings: Settings) -> List[Any]:
@@ -143,18 +130,105 @@ def _build_llm(settings: Settings) -> Any:
 
 
 class _AgentRunner:
-    """Lightweight adapter exposing invoke/stream on the LangGraph agent."""
+    """Lightweight adapter orchestrating the query processor and research agent."""
 
-    def __init__(self, agent_graph: Any, settings: Settings, telemetry_handler: Any | None = None) -> None:
-        self._agent = agent_graph
+    def __init__(
+        self,
+        agent_graph: Any,  # Kept for signature compatibility but ignored in new flow
+        settings: Settings,
+        telemetry_handler: Any | None = None,
+        tools: List[Any] | None = None,
+        llm: Any | None = None,
+    ) -> None:
         self._recursion_limit = max(1, settings.agent.max_iterations)
         self._telemetry_handler = telemetry_handler
+        self._settings = settings
+        self._tools = tools or []
+        self._llm = llm
+        
+        from src.agent.query_processor import QueryProcessor
+        self._query_processor = QueryProcessor(settings, llm)
 
     def invoke(self, payload: Dict[str, Any]) -> Any:
-        return self._agent.invoke(payload, config={"recursion_limit": self._recursion_limit})
+        # 1. Analyze Query
+        input_query = payload.get("input", "")
+        analysis = self._query_processor.analyze(input_query)
+        
+        # 2. Build Dynamic System Prompt
+        context_notes = analysis.context_notes or "No special context."
+        search_terms = ", ".join(analysis.search_terms)
+        subreddits = ", ".join(analysis.subreddits)
+        
+        system_prompt = f"""You are a research assistant that finds discussions about topics users ask about.
+
+User Query: "{analysis.refined_query}"
+Search Terms Strategy: {search_terms}
+Target Subreddits: {subreddits}
+Context/Instructions: {context_notes}
+
+CRITICAL RULE FOR TOOL USAGE:
+- Use the provided search terms and subreddits as your primary guide.
+- When using reddit_search, use the specific subreddits identified above if possible.
+- If user asks about "issues with ecommerce billing" -> query="issues with ecommerce billing" (or the refined query provided).
+
+After searching, summarize the findings. Call the search tool only ONCE."""
+
+        # 3. Rebuild Agent with new prompt
+        # We need to import here to handle potential circular imports or lazy loading if needed,
+        # but primarily to ensure we use the same creation logic.
+        try:
+            # Preferred location (langchain>=0.3)
+            from langchain.agents import create_react_agent  # type: ignore
+        except Exception:
+            # Fallback for installations that still expose the helper via langgraph.prebuilt
+            from langgraph.prebuilt import create_react_agent  # type: ignore
+
+        instrumented_tools = _attach_telemetry(self._tools, self._telemetry_handler)
+        
+        try:
+            agent = create_react_agent(model=self._llm, tools=instrumented_tools, prompt=system_prompt)
+        except TypeError:
+            agent = create_react_agent(llm=self._llm, tools=instrumented_tools, prompt=system_prompt)
+
+        # 4. Invoke Agent
+        # Pass the refined query as input to the agent so it sees the clean version
+        return agent.invoke({"input": analysis.refined_query}, config={"recursion_limit": self._recursion_limit})
 
     def stream(self, payload: Dict[str, Any]):
-        yield from self._agent.stream(payload, config={"recursion_limit": self._recursion_limit})
+        # Duplicate logic for streaming - ideally refactor common parts
+        input_query = payload.get("input", "")
+        analysis = self._query_processor.analyze(input_query)
+        
+        context_notes = analysis.context_notes or "No special context."
+        search_terms = ", ".join(analysis.search_terms)
+        subreddits = ", ".join(analysis.subreddits)
+        
+        system_prompt = f"""You are a research assistant that finds discussions about topics users ask about.
+
+User Query: "{analysis.refined_query}"
+Search Terms Strategy: {search_terms}
+Target Subreddits: {subreddits}
+Context/Instructions: {context_notes}
+
+CRITICAL RULE FOR TOOL USAGE:
+- Use the provided search terms and subreddits as your primary guide.
+- When using reddit_search, use the specific subreddits identified above if possible.
+
+After searching, summarize the findings. Call the search tool only ONCE."""
+
+        try:
+            from langchain.agents import create_react_agent  # type: ignore
+        except Exception:
+            from langgraph.prebuilt import create_react_agent  # type: ignore
+
+        instrumented_tools = _attach_telemetry(self._tools, self._telemetry_handler)
+        
+        try:
+            agent = create_react_agent(model=self._llm, tools=instrumented_tools, prompt=system_prompt)
+        except TypeError:
+            agent = create_react_agent(llm=self._llm, tools=instrumented_tools, prompt=system_prompt)
+
+        yield from agent.stream({"input": analysis.refined_query}, config={"recursion_limit": self._recursion_limit})
 
     def get_used_tools(self) -> List[str]:
         """Return a unique list of tool names observed via telemetry."""
