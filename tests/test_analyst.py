@@ -32,16 +32,9 @@ def analyst(mock_settings, mock_llm):
     return Analyst(mock_settings, mock_llm)
 
 
-def test_analyst_keyword_filter_removes_irrelevant():
+def test_analyst_keyword_filter_removes_irrelevant(mock_settings, mock_llm):
     """Test that keyword filter removes documents without query keywords."""
-    settings = Mock(spec=Settings)
-    settings.api = Mock()
-    settings.api.openai_api_key = "test-key"
-    settings.llm = Mock()
-    settings.llm.model = "gpt-4"
-    settings.llm.request_timeout_seconds = 30
-    
-    analyst = Analyst(settings, Mock())
+    analyst = Analyst(mock_settings, mock_llm)
     
     query = "Grok API issues"
     documents = [
@@ -70,31 +63,17 @@ def test_analyst_keyword_filter_removes_irrelevant():
     assert any("grok" in doc.get("title", "").lower() or "grok" in doc.get("body", "").lower() for doc in filtered)
 
 
-def test_analyst_empty_documents():
+def test_analyst_empty_documents(mock_settings, mock_llm):
     """Test analyst handles empty document list."""
-    settings = Mock(spec=Settings)
-    settings.api = Mock()
-    settings.api.openai_api_key = "test-key"
-    settings.llm = Mock()
-    settings.llm.model = "gpt-4"
-    settings.llm.request_timeout_seconds = 30
-    
-    analyst = Analyst(settings, Mock())
+    analyst = Analyst(mock_settings, mock_llm)
     
     result = analyst.review_and_filter_results("test query", [])
     assert result == []
 
 
-def test_analyst_extract_keywords():
+def test_analyst_extract_keywords(mock_settings, mock_llm):
     """Test keyword extraction from query."""
-    settings = Mock(spec=Settings)
-    settings.api = Mock()
-    settings.api.openai_api_key = "test-key"
-    settings.llm = Mock()
-    settings.llm.model = "gpt-4"
-    settings.llm.request_timeout_seconds = 30
-    
-    analyst = Analyst(settings, Mock())
+    analyst = Analyst(mock_settings, mock_llm)
     
     # Test basic keyword extraction
     keywords = analyst._extract_keywords("Pain points with Grok API")
@@ -106,16 +85,9 @@ def test_analyst_extract_keywords():
     assert "billing" in keywords
 
 
-def test_analyst_is_specific_entity_query():
+def test_analyst_is_specific_entity_query(mock_settings, mock_llm):
     """Test detection of specific entity queries."""
-    settings = Mock(spec=Settings)
-    settings.api = Mock()
-    settings.api.openai_api_key = "test-key"
-    settings.llm = Mock()
-    settings.llm.model = "gpt-4"
-    settings.llm.request_timeout_seconds = 30
-    
-    analyst = Analyst(settings, Mock())
+    analyst = Analyst(mock_settings, mock_llm)
     
     # Should detect API queries
     assert analyst._is_specific_entity_query("Grok API issues")
@@ -128,16 +100,9 @@ def test_analyst_is_specific_entity_query():
     assert not analyst._is_specific_entity_query("general coding problems")
 
 
-def test_analyst_keyword_filter_all_documents_relevant():
+def test_analyst_keyword_filter_all_documents_relevant(mock_settings, mock_llm):
     """Test that all documents pass when they mention keywords."""
-    settings = Mock(spec=Settings)
-    settings.api = Mock()
-    settings.api.openai_api_key = "test-key"
-    settings.llm = Mock()
-    settings.llm.model = "gpt-4"
-    settings.llm.request_timeout_seconds = 30
-    
-    analyst = Analyst(settings, Mock())
+    analyst = Analyst(mock_settings, mock_llm)
     
     query = "coding problems"
     documents = [

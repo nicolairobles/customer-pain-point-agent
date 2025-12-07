@@ -18,6 +18,10 @@ from config.settings import Settings
 
 LOGGER = logging.getLogger(__name__)
 
+# Minimum length for a keyword to be considered an "entity keyword" (e.g., "grok api", "stripe")
+# Shorter keywords like "api", "sdk" are too generic and could match irrelevant content
+MIN_ENTITY_KEYWORD_LENGTH = 6
+
 
 class Analyst:
     """Reviews research output and filters results for relevance to the query."""
@@ -120,7 +124,7 @@ class Analyst:
         
         # Find the most specific keywords (multi-word phrases, or unique entity names)
         # These should be present for the document to be relevant
-        entity_keywords = [k for k in keywords if ' ' in k or len(k) > 6]
+        entity_keywords = [k for k in keywords if ' ' in k or len(k) > MIN_ENTITY_KEYWORD_LENGTH]
         
         # If we have entity keywords, use strict matching (require entity name)
         # Otherwise use lenient matching (require any keyword)
