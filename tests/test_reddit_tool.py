@@ -129,7 +129,7 @@ def test_reddit_tool_returns_normalized_results(monkeypatch, settings):
     assert results[0]["permalink"] == "/r/python/comments/a1"
     assert results[0]["url"] == "http://x/1"
     assert results[0]["content_flags"] == ["nsfw"]
-    # Note: Second post (T2) is filtered out due to relevance check since it doesn't contain "body"
+    # Note: Second post (T2) is filtered out because its text is empty ("") and title "T2" doesn't contain "body"
 
 
 def test_reddit_tool_handles_empty_and_errors(monkeypatch, settings):

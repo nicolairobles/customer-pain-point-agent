@@ -53,7 +53,7 @@ Your goal is to analyze the User's Query and output a JSON object with the follo
    - Include key terms that would appear in relevant posts
 2. "search_terms": A list of 3-5 keywords or short phrases that describe what to look for (e.g., ["checkout", "payment", "cart abandoned"]).
    - These help identify relevant content
-3. "subreddits": A list of 5-8 relevant subreddits where this topic is likely discussed.
+3. "subreddits": A list of 4-8 relevant subreddits where this topic is likely discussed.
    - CRITICAL: Choose subreddits where the SPECIFIC topic is discussed, not just general business subreddits
    - For tech/SaaS topics: include "SaaS", "webdev", "startups", "Entrepreneur"
    - For ecommerce: include "ecommerce", "shopify", "smallbusiness", "Entrepreneur"

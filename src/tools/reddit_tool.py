@@ -67,6 +67,13 @@ class RedditToolInput(BaseModel):
 
 _LOG = logging.getLogger(__name__)
 
+# Relevance filtering constants
+MIN_QUERY_LENGTH = 2  # Queries shorter than this bypass filtering
+MIN_TERM_LENGTH = 2   # Query terms shorter than this are ignored
+
+# Retry configuration constants
+BACKOFF_MULTIPLIER = 1.5  # Multiplier for exponential backoff between retries
+
 
 class RedditTool(BaseTool):
     """Fetches relevant Reddit posts based on a user query.
@@ -237,7 +244,7 @@ class RedditTool(BaseTool):
                     break
 
                 time.sleep(backoff)
-                backoff *= 1.5  # Multiplicative backoff: 2s -> 3s -> 4.5s -> 6.75s -> 10.1s
+                backoff *= BACKOFF_MULTIPLIER  # Multiplicative backoff: 2s -> 3s -> 4.5s -> 6.75s -> 10.1s
 
         _LOG.error("Failed to fetch subreddit r/%s after %d attempts - posts from this subreddit will be skipped", subreddit_name, retries + 1)
         return []
@@ -249,13 +256,13 @@ class RedditTool(BaseTool):
         This helps filter out posts that are just popular in the subreddit
         but not related to the actual search query.
         """
-        if not query or len(query) <= 2:
+        if not query or len(query) <= MIN_QUERY_LENGTH:
             # For very short or empty queries, accept all posts
             return True
             
         # Extract query terms (simple tokenization)
         query_lower = query.lower()
-        query_terms = [term for term in query_lower.split() if len(term) > 2]
+        query_terms = [term for term in query_lower.split() if len(term) > MIN_TERM_LENGTH]
         
         # If no meaningful terms, accept the post
         if not query_terms:
