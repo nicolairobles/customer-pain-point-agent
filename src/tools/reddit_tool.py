@@ -256,7 +256,7 @@ class RedditTool(BaseTool):
         This helps filter out posts that are just popular in the subreddit
         but not related to the actual search query.
         """
-        if not query or len(query) <= MIN_QUERY_LENGTH:
+        if not query or len(query) < MIN_QUERY_LENGTH:
             # For very short or empty queries, accept all posts
             return True
             
