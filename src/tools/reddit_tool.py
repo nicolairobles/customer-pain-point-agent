@@ -237,7 +237,7 @@ class RedditTool(BaseTool):
                     break
 
                 time.sleep(backoff)
-                backoff *= 1.5  # Exponential backoff: 2s -> 3s -> 4.5s -> 6.75s -> 10.1s
+                backoff *= 1.5  # Multiplicative backoff: 2s -> 3s -> 4.5s -> 6.75s -> 10.1s
 
         _LOG.error("Failed to fetch subreddit r/%s after %d attempts - posts from this subreddit will be skipped", subreddit_name, retries + 1)
         return []
@@ -263,7 +263,7 @@ class RedditTool(BaseTool):
         
         # Get post content
         title = (post.get("title") or "").lower()
-        # Note: normalized posts use "text" field, not "body"
+        # Note: normalize_submission() converts Reddit's 'selftext' to 'text' field
         text = (post.get("text") or "").lower()
         combined_text = f"{title} {text}"
         
