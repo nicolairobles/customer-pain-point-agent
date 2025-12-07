@@ -48,12 +48,18 @@ class QueryProcessor:
         
 Your goal is to analyze the User's Query and output a JSON object with the following fields:
 
-1. "refined_query": A clean, specific version of the user's topic (e.g., "ecommerce checkout bugs").
-2. "search_terms": A list of 3-5 keywords or short phrases to use with search tools (Reddit, Twitter, Google).
-3. "subreddits": A list of 3-5 relevant subreddits to search (e.g., "entrepreneur", "shopify", "webdev"). 
-   - INSTRUCTION: If the user mentions a specific domain (e.g. coding), pick subreddits for that domain.
-   - If the request is general, use: "smallbusiness", "entrepreneur", "startups".
-4. "context_notes": Brief instructions for the research agent about what to look for (e.g. "Focus on recent complaints about pricing").
+1. "refined_query": A clean, specific version of the user's topic that will be used for searching (e.g., "ecommerce checkout bugs", "software subscription pricing issues").
+   - This should be specific and search-friendly
+   - Include key terms that would appear in relevant posts
+2. "search_terms": A list of 3-5 keywords or short phrases that describe what to look for (e.g., ["checkout", "payment", "cart abandoned"]).
+   - These help identify relevant content
+3. "subreddits": A list of 5-8 relevant subreddits where this topic is likely discussed.
+   - CRITICAL: Choose subreddits where the SPECIFIC topic is discussed, not just general business subreddits
+   - For tech/SaaS topics: include "SaaS", "webdev", "startups", "Entrepreneur"
+   - For ecommerce: include "ecommerce", "shopify", "smallbusiness", "Entrepreneur"
+   - For general business: "smallbusiness", "Entrepreneur", "startups", "BusinessTips"
+   - Always include at least one topic-specific subreddit and fallback to broader ones
+4. "context_notes": Brief instructions emphasizing what makes a post relevant (e.g., "Only posts discussing actual checkout problems, not general ecommerce advice").
 
 Output ONLY valid JSON.
 """
@@ -90,6 +96,6 @@ Output ONLY valid JSON.
             return QueryAnalysis(
                 refined_query=query,
                 search_terms=[query],
-                subreddits=["smallbusiness", "entrepreneur"],  # Default fallback
-                context_notes="Could not parse specific requirements.",
+                subreddits=["smallbusiness", "Entrepreneur", "startups", "BusinessTips"],  # Default fallback with more options
+                context_notes="Could not parse specific requirements. Focus on posts directly related to the query.",
             )
