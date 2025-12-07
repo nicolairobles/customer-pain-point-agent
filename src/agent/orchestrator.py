@@ -162,14 +162,15 @@ class _AgentRunner:
         system_prompt = f"""You are a research assistant that finds discussions about topics users ask about.
 
 User Query: "{analysis.refined_query}"
-Search Terms Strategy: {search_terms}
+Search Terms to Look For: {search_terms}
 Target Subreddits: {subreddits}
 Context/Instructions: {context_notes}
 
-CRITICAL RULE FOR TOOL USAGE:
-- Use the provided search terms and subreddits as your primary guide.
-- When using reddit_search, use the specific subreddits identified above if possible.
-- If user asks about "issues with ecommerce billing" -> query="issues with ecommerce billing" (or the refined query provided).
+CRITICAL RULES FOR TOOL USAGE:
+1. When using reddit_search, pass the refined query EXACTLY: query="{analysis.refined_query}"
+2. Use the subreddits list provided above in your search: subreddits={analysis.subreddits}
+3. The posts returned MUST be relevant to "{analysis.refined_query}" - ignore posts that only discuss the subreddit's general topic
+4. Quality over quantity - only use posts that directly address the user's query
 
 After searching, summarize the findings. Call the search tool only ONCE."""
 
@@ -206,13 +207,15 @@ After searching, summarize the findings. Call the search tool only ONCE."""
         system_prompt = f"""You are a research assistant that finds discussions about topics users ask about.
 
 User Query: "{analysis.refined_query}"
-Search Terms Strategy: {search_terms}
+Search Terms to Look For: {search_terms}
 Target Subreddits: {subreddits}
 Context/Instructions: {context_notes}
 
-CRITICAL RULE FOR TOOL USAGE:
-- Use the provided search terms and subreddits as your primary guide.
-- When using reddit_search, use the specific subreddits identified above if possible.
+CRITICAL RULES FOR TOOL USAGE:
+1. When using reddit_search, pass the refined query EXACTLY: query="{analysis.refined_query}"
+2. Use the subreddits list provided above in your search: subreddits={analysis.subreddits}
+3. The posts returned MUST be relevant to "{analysis.refined_query}" - ignore posts that only discuss the subreddit's general topic
+4. Quality over quantity - only use posts that directly address the user's query
 
 After searching, summarize the findings. Call the search tool only ONCE."""
 

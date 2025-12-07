@@ -114,10 +114,12 @@ def test_reddit_tool_returns_normalized_results(monkeypatch, settings):
     monkeypatch.setattr("src.tools.reddit_tool.praw.Reddit", lambda **kw: client)
 
     tool = RedditTool.from_settings(settings)
-    results = tool._run("test-query", subreddits=["python", "learnprogramming", "programming"], limit=5, per_subreddit=2)
+    # Use "body" as query since it appears in the test data, testing relevance filtering
+    results = tool._run("body", subreddits=["python", "learnprogramming", "programming"], limit=5, per_subreddit=2)
 
     assert isinstance(results, list)
-    assert len(results) == 2
+    # With relevance filtering, only posts matching "body" query are returned (1 post)
+    assert len(results) == 1
     # Markdown has been stripped and user mention normalised.
     assert results[0]["title"] == "T1"
     assert results[0]["text"] == "body1 with link and @example"
@@ -127,10 +129,7 @@ def test_reddit_tool_returns_normalized_results(monkeypatch, settings):
     assert results[0]["permalink"] == "/r/python/comments/a1"
     assert results[0]["url"] == "http://x/1"
     assert results[0]["content_flags"] == ["nsfw"]
-
-    # Second item picks up prefixed subreddit and unknown author fallback.
-    assert results[1]["subreddit"] == "python"
-    assert results[1]["author"] == "unknown-author"
+    # Note: Second post (T2) is filtered out because its text is empty ("") and title "T2" doesn't contain "body"
 
 
 def test_reddit_tool_handles_empty_and_errors(monkeypatch, settings):
@@ -227,3 +226,26 @@ def test_normalized_schema_matches_pydantic_model(monkeypatch, settings):
     serialized = json.dumps(model_dict)
 
     assert json.loads(serialized) == model_dict
+
+
+def test_relevance_filtering_removes_irrelevant_posts(monkeypatch, settings):
+    """Test that posts not matching the query are filtered out."""
+    items = [
+        DummySubmission("r1", "Bug in checkout", "Users can't complete checkout", 10, 5, "u1", "ecommerce", 1),
+        DummySubmission("r2", "General business advice", "How to grow your business", 20, 10, "u2", "entrepreneur", 1),
+        DummySubmission("r3", "Checkout issues with Stripe", "Payment failures during checkout", 15, 8, "u3", "webdev", 1),
+    ]
+    
+    client = DummyRedditClient({"ecommerce": DummySubreddit(items)})
+    monkeypatch.setattr("src.tools.reddit_tool.praw.Reddit", lambda **kw: client)
+    
+    tool = RedditTool.from_settings(settings)
+    # Search for "checkout" - should filter out the general business advice post
+    results = tool._run("checkout problems", subreddits=["ecommerce"], limit=10, per_subreddit=10)
+    
+    # Should get 2 posts that mention "checkout", not the general business one
+    assert len(results) == 2
+    titles = [r["title"] for r in results]
+    assert "Bug in checkout" in titles
+    assert "Checkout issues with Stripe" in titles
+    assert "General business advice" not in titles
