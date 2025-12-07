@@ -218,7 +218,7 @@ def render_results(results: Dict[str, Any]) -> None:
         for message in warnings:
             st.markdown(f"- {_escape_markdown(message)}")
 
-    if not pain_points:
+    if not pain_points and not results.get("output"):
         st.info("No pain points identified yet. Try refining your query or adjusting filters.")
         return
 
@@ -233,31 +233,38 @@ def render_results(results: Dict[str, Any]) -> None:
             if stat.help_text:
                 column.caption(stat.help_text)
 
-    st.subheader("Insights")
-    tab_labels = [display.title for display in pain_points]
-    tabs = st.tabs(tab_labels)
+    # Display Analyst Report if available
+    if results.get("output"):
+        st.subheader("Analyst Report")
+        # Ensure the output is treated as a string
+        st.markdown(str(results["output"]))
 
-    for tab, pain_point in zip(tabs, pain_points):
-        with tab:
-            summary_html = html.escape(pain_point.summary)
-            frequency_html = html.escape(pain_point.frequency_label)
-            st.markdown(
-                f"""
-                <div class="pp-card">
-                    <p>{summary_html}</p>
-                    <p class="pp-frequency">{frequency_html}</p>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
+    if pain_points:
+        st.subheader("Insights")
+        tab_labels = [display.title for display in pain_points]
+        tabs = st.tabs(tab_labels)
 
-            if pain_point.examples:
-                st.markdown("**Examples**")
-                for example in pain_point.examples:
-                    st.markdown(f"- {_escape_markdown(example)}")
+        for tab, pain_point in zip(tabs, pain_points):
+            with tab:
+                summary_html = html.escape(pain_point.summary)
+                frequency_html = html.escape(pain_point.frequency_label)
+                st.markdown(
+                    f"""
+                    <div class="pp-card">
+                        <p>{summary_html}</p>
+                        <p class="pp-frequency">{frequency_html}</p>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
 
-            if pain_point.citations:
-                st.markdown("**Source Citations**")
-                for citation in pain_point.citations:
-                    st.markdown(f"- {citation}")
+                if pain_point.examples:
+                    st.markdown("**Examples**")
+                    for example in pain_point.examples:
+                        st.markdown(f"- {_escape_markdown(example)}")
+
+                if pain_point.citations:
+                    st.markdown("**Source Citations**")
+                    for citation in pain_point.citations:
+                        st.markdown(f"- {citation}")
 
