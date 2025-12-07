@@ -244,7 +244,7 @@ class RedditTool(BaseTool):
                     break
 
                 time.sleep(backoff)
-                backoff *= BACKOFF_MULTIPLIER  # Multiplicative backoff: 2s -> 3s -> 4.5s -> 6.75s -> 10.1s
+                backoff *= BACKOFF_MULTIPLIER  # Multiplicative backoff: 2s -> 3s -> 4.5s -> 6.75s
 
         _LOG.error("Failed to fetch subreddit r/%s after %d attempts - posts from this subreddit will be skipped", subreddit_name, retries + 1)
         return []
