@@ -129,6 +129,50 @@ def _build_llm(settings: Settings) -> Any:
     )
 
 
+class _AnalystFilteredTool:
+    """Wrapper that filters tool results through the analyst before returning."""
+    
+    def __init__(self, tool: Any, analyst: Any, runner: Any) -> None:
+        self._tool = tool
+        self._analyst = analyst
+        self._runner = runner
+        # Expose tool attributes for LangChain compatibility
+        self.name = getattr(tool, 'name', 'unknown_tool')
+        self.description = getattr(tool, 'description', '')
+        self.args_schema = getattr(tool, 'args_schema', None)
+        self.callbacks = getattr(tool, 'callbacks', [])
+    
+    def _run(self, *args: Any, **kwargs: Any) -> Any:
+        """Execute tool and filter results through analyst."""
+        # Call the original tool
+        results = self._tool._run(*args, **kwargs)
+        
+        # Only filter if results are a list of documents
+        if not isinstance(results, list) or not results:
+            return results
+        
+        # Check if results look like documents (have dict-like structure)
+        if not all(isinstance(r, dict) for r in results):
+            return results
+        
+        # Get current query from runner
+        query = getattr(self._runner, '_current_query', '')
+        if not query:
+            return results
+        
+        # Apply analyst filtering
+        filtered = self._analyst.review_and_filter_results(query, results)
+        return filtered
+    
+    async def _arun(self, *args: Any, **kwargs: Any) -> Any:
+        """Async version - just call sync for now."""
+        return self._run(*args, **kwargs)
+    
+    def __getattr__(self, name: str) -> Any:
+        """Delegate other attributes to the wrapped tool."""
+        return getattr(self._tool, name)
+
+
 class _AgentRunner:
     """Lightweight adapter orchestrating the query processor and research agent."""
 
@@ -145,14 +189,20 @@ class _AgentRunner:
         self._settings = settings
         self._tools = tools or []
         self._llm = llm
+        self._current_query = ""  # Store current query for analyst filtering
         
         from src.agent.query_processor import QueryProcessor
+        from src.agent.analyst import Analyst
         self._query_processor = QueryProcessor(settings, llm)
+        self._analyst = Analyst(settings, llm)
 
     def invoke(self, payload: Dict[str, Any]) -> Any:
         # 1. Analyze Query
         input_query = payload.get("input", "")
         analysis = self._query_processor.analyze(input_query)
+        
+        # Store query for analyst filtering
+        self._current_query = input_query
         
         # 2. Build Dynamic System Prompt
         context_notes = analysis.context_notes or "No special context."
@@ -183,7 +233,9 @@ After searching, summarize the findings. Call the search tool only ONCE."""
             # Fallback for installations that still expose the helper via langgraph.prebuilt
             from langgraph.prebuilt import create_react_agent  # type: ignore
 
-        instrumented_tools = _attach_telemetry(self._tools, self._telemetry_handler)
+        # Wrap tools with analyst filtering
+        filtered_tools = self._wrap_tools_with_analyst(self._tools)
+        instrumented_tools = _attach_telemetry(filtered_tools, self._telemetry_handler)
         
         try:
             agent = create_react_agent(model=self._llm, tools=instrumented_tools, prompt=system_prompt)
@@ -198,6 +250,9 @@ After searching, summarize the findings. Call the search tool only ONCE."""
         # Duplicate logic for streaming - ideally refactor common parts
         input_query = payload.get("input", "")
         analysis = self._query_processor.analyze(input_query)
+        
+        # Store query for analyst filtering
+        self._current_query = input_query
         
         context_notes = analysis.context_notes or "No special context."
         search_terms = ", ".join(analysis.search_terms)
@@ -221,7 +276,9 @@ After searching, summarize the findings. Call the search tool only ONCE."""
         except Exception:
             from langgraph.prebuilt import create_react_agent  # type: ignore
 
-        instrumented_tools = _attach_telemetry(self._tools, self._telemetry_handler)
+        # Wrap tools with analyst filtering
+        filtered_tools = self._wrap_tools_with_analyst(self._tools)
+        instrumented_tools = _attach_telemetry(filtered_tools, self._telemetry_handler)
         
         try:
             agent = create_react_agent(model=self._llm, tools=instrumented_tools, prompt=system_prompt)
@@ -238,6 +295,14 @@ After searching, summarize the findings. Call the search tool only ONCE."""
         if not used:
             return []
         return sorted({str(name) for name in used if name})
+    
+    def _wrap_tools_with_analyst(self, tools: List[Any]) -> List[Any]:
+        """Wrap tools to filter their output through the analyst."""
+        wrapped = []
+        for tool in tools:
+            wrapped_tool = _AnalystFilteredTool(tool, self._analyst, self)
+            wrapped.append(wrapped_tool)
+        return wrapped
 
 
 def _attach_telemetry(tools: Iterable[Any], handler: Any) -> List[Any]:
