@@ -109,10 +109,22 @@ class Analyst:
         documents: Sequence[Dict[str, Any]], 
         keywords: List[str]
     ) -> List[Dict[str, Any]]:
-        """Fast filter that removes documents that don't mention any query keywords."""
+        """Fast filter that removes documents that don't mention query keywords.
+        
+        For specific entity queries (e.g., "Grok API"), requires the entity name
+        to be present. For general queries, requires at least one keyword.
+        """
         if not keywords:
             # If no keywords extracted, return all documents
             return list(documents)
+        
+        # Find the most specific keywords (multi-word phrases, or unique entity names)
+        # These should be present for the document to be relevant
+        entity_keywords = [k for k in keywords if ' ' in k or len(k) > 6]
+        
+        # If we have entity keywords, use strict matching (require entity name)
+        # Otherwise use lenient matching (require any keyword)
+        use_strict_matching = len(entity_keywords) > 0
         
         filtered = []
         for doc in documents:
@@ -129,9 +141,14 @@ class Analyst:
             
             combined_text = ' '.join(text_fields).lower()
             
-            # Document is relevant if it mentions at least one keyword
-            if any(keyword in combined_text for keyword in keywords):
-                filtered.append(doc)
+            if use_strict_matching:
+                # For specific entities, require the entity name to be mentioned
+                if any(entity_kw in combined_text for entity_kw in entity_keywords):
+                    filtered.append(doc)
+            else:
+                # For general queries, any keyword match is sufficient
+                if any(keyword in combined_text for keyword in keywords):
+                    filtered.append(doc)
         
         return filtered
 
