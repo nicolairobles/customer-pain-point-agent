@@ -22,9 +22,17 @@ class TestQueryFlow:
         
         submit_button.click()
         
-        # Wait for some indication that processing started
-        # Streamlit shows a spinner or loading indicator
-        page_with_server.wait_for_timeout(2000)  # Brief wait for state change
+        # Wait for Streamlit's loading spinner to appear
+        # Streamlit uses data-testid="stSpinner" for loading indicators
+        spinner = page_with_server.locator("[data-testid='stSpinner']").or_(
+            page_with_server.locator("text=Running")
+        )
+        # Either we see a spinner, or results appear quickly
+        try:
+            spinner.first.wait_for(timeout=5000)
+            print("✓ Loading spinner detected")
+        except:
+            print("✓ Query processed quickly (no spinner needed)")
         
         # Page should still be responsive
         expect(page_with_server.locator("[data-testid='stApp']")).to_be_visible()

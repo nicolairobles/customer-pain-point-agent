@@ -17,7 +17,7 @@ class TestAnalystReport:
         query_input = page_with_server.locator("textarea").first
         query_input.fill("OpenAI API developer pain points")
         
-        submit_button = page_with_server.locator("button").first
+        submit_button = page_with_server.locator("button:has-text('Analyze')").first
         submit_button.click()
         
         # Wait for Analyst Report to appear
@@ -34,15 +34,21 @@ class TestAnalystReport:
         print(f"Page content length: {len(page_content)}")
         
         # The report should have a Conclusion section (our prompt requires it)
-        assert "Conclusion" in page_content or "conclusion" in page_content.lower(), \
-            "Analyst Report appears to be truncated - no Conclusion section found"
+        try:
+            assert "Conclusion" in page_content or "conclusion" in page_content.lower(), \
+                "Analyst Report appears to be truncated - no Conclusion section found"
+        except AssertionError:
+            # Capture screenshot for debugging
+            page_with_server.screenshot(path="tests/e2e/screenshots/analyst_report_failure.png")
+            print("✗ Screenshot saved to tests/e2e/screenshots/analyst_report_failure.png")
+            raise
 
     def test_analyst_report_not_cut_mid_sentence(self, page_with_server: Page):
         """Verify the report doesn't end abruptly mid-sentence."""
         query_input = page_with_server.locator("textarea").first
         query_input.fill("Twitter API developer frustrations")
         
-        submit_button = page_with_server.locator("button").first
+        submit_button = page_with_server.locator("button:has-text('Analyze')").first
         submit_button.click()
         
         # Wait for results
