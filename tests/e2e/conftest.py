@@ -7,6 +7,29 @@ import pytest
 from typing import Generator
 
 
+@pytest.fixture(scope="session")
+def browser_context_args(browser_context_args):
+    """Configure browser context to prevent popups and session restore."""
+    return {
+        **browser_context_args,
+        "ignore_https_errors": True,
+    }
+
+
+@pytest.fixture(scope="session")
+def browser_type_launch_args(browser_type_launch_args):
+    """Configure browser launch to prevent restore dialogs."""
+    return {
+        **browser_type_launch_args,
+        "args": [
+            "--disable-session-crashed-bubble",
+            "--disable-features=TranslateUI",
+            "--no-first-run",
+            "--disable-popup-blocking",
+        ],
+    }
+
+
 def _find_available_port(start: int = 8501, end: int = 8599) -> int:
     """Find an available port in the given range."""
     for port in range(start, end):
