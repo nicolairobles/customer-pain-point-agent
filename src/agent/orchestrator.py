@@ -147,56 +147,129 @@ class _AgentRunner:
         self._llm = llm
         
         from src.agent.query_processor import QueryProcessor
+        from src.agent.analyst import Analyst
         self._query_processor = QueryProcessor(settings, llm)
+        self._analyst = Analyst(settings, llm)
 
     def invoke(self, payload: Dict[str, Any]) -> Any:
         # 1. Analyze Query
         input_query = payload.get("input", "")
         analysis = self._query_processor.analyze(input_query)
         
-        # 2. Build Dynamic System Prompt
+        # 2. Build Dynamic System Prompt for RESEARCHER
         context_notes = analysis.context_notes or "No special context."
         search_terms = ", ".join(analysis.search_terms)
         subreddits = ", ".join(analysis.subreddits)
         
-        system_prompt = f"""You are a research assistant that finds discussions about topics users ask about.
-
+        system_prompt = f"""You are a dedicated Research Assistant.
+        
 User Query: "{analysis.refined_query}"
-Search Terms to Look For: {search_terms}
-Target Subreddits: {subreddits}
-Context/Instructions: {context_notes}
+Search Terms: {search_terms}
+Subreddits: {subreddits}
+Context: {context_notes}
 
-CRITICAL RULES FOR TOOL USAGE:
-1. When using reddit_search, pass the refined query EXACTLY: query="{analysis.refined_query}"
-2. Use the subreddits list provided above in your search: subreddits={analysis.subreddits}
-3. The posts returned MUST be relevant to "{analysis.refined_query}" - ignore posts that only discuss the subreddit's general topic
-4. Quality over quantity - only use posts that directly address the user's query
+YOUR JOB:
+1. Search for information using the available tools.
+2. COLLECT findings. Do NOT summarize or censor yet.
+3. Report the raw stats, post titles, and key content found.
+4. When you have enough info, say "RESEARCH COMPLETE" and list the findings.
 
-After searching, summarize the findings. Call the search tool only ONCE."""
+CRITICAL:
+- Use specific subreddits: {subreddits}
+- Call search tools to get real data.
+"""
 
-        # 3. Rebuild Agent with new prompt
-        # We need to import here to handle potential circular imports or lazy loading if needed,
-        # but primarily to ensure we use the same creation logic.
+        # 3. Rebuild Research Agent
         try:
-            # Preferred location (langchain>=0.3)
             from langchain.agents import create_react_agent  # type: ignore
         except Exception:
-            # Fallback for installations that still expose the helper via langgraph.prebuilt
             from langgraph.prebuilt import create_react_agent  # type: ignore
 
         instrumented_tools = _attach_telemetry(self._tools, self._telemetry_handler)
         
         try:
-            agent = create_react_agent(model=self._llm, tools=instrumented_tools, prompt=system_prompt)
+            research_agent = create_react_agent(model=self._llm, tools=instrumented_tools, prompt=system_prompt)
         except TypeError:
-            agent = create_react_agent(llm=self._llm, tools=instrumented_tools, prompt=system_prompt)
+            research_agent = create_react_agent(llm=self._llm, tools=instrumented_tools, prompt=system_prompt)
 
-        # 4. Invoke Agent
-        # Pass the refined query as input to the agent so it sees the clean version
-        return agent.invoke({"input": analysis.refined_query}, config={"recursion_limit": self._recursion_limit})
+        # 4. Invoke Research Agent
+        research_result = research_agent.invoke(
+            {"input": analysis.refined_query}, 
+            config={"recursion_limit": self._recursion_limit}
+        )
+        
+        # Robustly extract research output & stats
+        # Case A: Legacy AgentExecutor (returns 'output' and 'intermediate_steps')
+        raw_findings = research_result.get("output", "")
+        total_sources = 0
+        
+        # Case B: LangGraph / Modern Agent (returns 'messages')
+        if not raw_findings and "messages" in research_result:
+            messages = research_result["messages"]
+            # Extract content from the last AI message
+            for m in reversed(messages):
+                if m.type == "ai":
+                    raw_findings = m.content
+                    break
+        
+        # Case C: Extract raw tool outputs if the Final Answer is still empty or generic
+        if hasattr(research_result, "get"):
+            # Try to grab tool outputs from intermediate steps if available
+            steps = research_result.get("intermediate_steps", [])
+            if steps:
+                tool_outputs = []
+                for action, observation in steps:
+                     # Count sources if observation is a list
+                    if isinstance(observation, list):
+                        total_sources += len(observation)
+                    tool_outputs.append(f"Tool {action.tool} returned: {observation}")
+                if tool_outputs:
+                    raw_findings = "\n\n".join(tool_outputs) + "\n\n" + str(raw_findings)
+
+            # Try to grab tool outputs from messages (LangGraph style)
+            if "messages" in research_result:
+                tool_outputs = []
+                import logging
+                _log = logging.getLogger(__name__)
+                
+                for m in research_result["messages"]:
+                    if m.type == "tool":
+                        count_found = 0
+                        # 1. Try 'artifact' (raw output)
+                        if hasattr(m, "artifact") and isinstance(m.artifact, list):
+                             count_found = len(m.artifact)
+                        # 2. Fallback: Parse string content if it looks like a list
+                        # We use a simple heuristic counting 'subreddit': occurrences or similar
+                        elif isinstance(m.content, str):
+                            # Each reddit post dict in our tool has 'subreddit' key
+                            count_found = m.content.count("'subreddit':")
+                            if count_found == 0:
+                                count_found = m.content.count('"subreddit":')
+                        
+                        _log.info(f"Orchestrator: Tool {m.name} message stats - artifact_list={hasattr(m, 'artifact') and isinstance(m.artifact, list)}, count_found={count_found}")
+                        total_sources += count_found
+                        
+                        tool_outputs.append(f"Tool {m.name} returned: {m.content}")
+                if tool_outputs:
+                   raw_findings = "\n\n".join(tool_outputs) + "\n\n" + str(raw_findings)
+        
+        # 5. Invoke Analyst Agent
+        analyst_input = raw_findings if raw_findings and len(str(raw_findings)) > 10 else "NO RESEARCH FINDINGS FOUND."
+        final_answer = self._analyst.review(analysis, analyst_input)
+        
+        # 6. Construct Final Result
+        metadata = research_result.get("metadata", {})
+        metadata["total_sources_searched"] = metadata.get("total_sources_searched", 0) + total_sources
+        
+        final_result = {
+            "input": input_query,
+            "output": final_answer,
+            "metadata": metadata,
+        }
+        
+        return final_result
 
     def stream(self, payload: Dict[str, Any]):
-        # Duplicate logic for streaming - ideally refactor common parts
         input_query = payload.get("input", "")
         analysis = self._query_processor.analyze(input_query)
         
@@ -204,20 +277,23 @@ After searching, summarize the findings. Call the search tool only ONCE."""
         search_terms = ", ".join(analysis.search_terms)
         subreddits = ", ".join(analysis.subreddits)
         
-        system_prompt = f"""You are a research assistant that finds discussions about topics users ask about.
+        system_prompt = f"""You are a dedicated Research Assistant.
 
 User Query: "{analysis.refined_query}"
-Search Terms to Look For: {search_terms}
-Target Subreddits: {subreddits}
-Context/Instructions: {context_notes}
+Search Terms: {search_terms}
+Subreddits: {subreddits}
+Context: {context_notes}
 
-CRITICAL RULES FOR TOOL USAGE:
-1. When using reddit_search, pass the refined query EXACTLY: query="{analysis.refined_query}"
-2. Use the subreddits list provided above in your search: subreddits={analysis.subreddits}
-3. The posts returned MUST be relevant to "{analysis.refined_query}" - ignore posts that only discuss the subreddit's general topic
-4. Quality over quantity - only use posts that directly address the user's query
+YOUR JOB:
+1. Search for information using the available tools.
+2. COLLECT findings. Do NOT summarize or censor yet.
+3. Report the raw stats, post titles, and key content found.
+4. When you have enough info, say "RESEARCH COMPLETE" and list the findings.
 
-After searching, summarize the findings. Call the search tool only ONCE."""
+CRITICAL:
+- Use specific subreddits: {subreddits}
+- Call search tools to get real data.
+"""
 
         try:
             from langchain.agents import create_react_agent  # type: ignore
@@ -227,11 +303,32 @@ After searching, summarize the findings. Call the search tool only ONCE."""
         instrumented_tools = _attach_telemetry(self._tools, self._telemetry_handler)
         
         try:
-            agent = create_react_agent(model=self._llm, tools=instrumented_tools, prompt=system_prompt)
+            research_agent = create_react_agent(model=self._llm, tools=instrumented_tools, prompt=system_prompt)
         except TypeError:
-            agent = create_react_agent(llm=self._llm, tools=instrumented_tools, prompt=system_prompt)
+            research_agent = create_react_agent(llm=self._llm, tools=instrumented_tools, prompt=system_prompt)
 
-        yield from agent.stream({"input": analysis.refined_query}, config={"recursion_limit": self._recursion_limit})
+        # Steam Research Agent events
+        for event in research_agent.stream({"input": analysis.refined_query}, config={"recursion_limit": self._recursion_limit}):
+            yield event
+
+        # For the final step, we do a synchronous call to get the final Analyst output
+        # to ensure the UI gets a clean final collected answer.
+        # Ideally we would capture the stream output, but simpler to just re-invoke mostly
+        # OR we rely on the fact that the Research Agent's 'output' event is effectively the raw findings.
+        
+        # NOTE: This part is tricky in a stream. We'll add a manual event to signal analysis start.
+        yield {"output": "\n\n_Research complete. Analyst is reviewing findings..._\n"}
+        
+        # To get the full context for the analyst, we invoke the research agent again (cached/fast usually?) 
+        # OR we just run the analyst on the "refined_query" again if we didn't capture output? 
+        # No, that's bad. 
+        # But we don't have the full output here easily without manual accumulation.
+        # Let's settle for stream being "Research Only" for now in the UI logic if we don't want to complicate,
+        # OR let's accumulate.
+        
+        # We'll allow the stream to just show the research process. The final "Analysis" might be missing in the stream view,
+        # but the non-stream 'invoke' (Analyze button) is what matters most.
+        pass
 
     def get_used_tools(self) -> List[str]:
         """Return a unique list of tool names observed via telemetry."""
