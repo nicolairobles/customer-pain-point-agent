@@ -149,7 +149,7 @@ class _AgentRunner:
         from src.agent.query_processor import QueryProcessor
         from src.agent.analyst import Analyst
         self._query_processor = QueryProcessor(settings, llm)
-        self._analyst = Analyst(settings, llm)
+        self._analyst = Analyst(settings)  # Analyst creates its own LLM with max_tokens=8192
 
     def invoke(self, payload: Dict[str, Any]) -> Any:
         # 1. Analyze Query
