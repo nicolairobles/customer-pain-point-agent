@@ -1,9 +1,12 @@
-langchain
+langchain>=1.0.7,<2
 openai
+langchain-openai
 streamlit
 praw
 tweepy
 google-api-python-client
 python-dotenv
 pytest
-pydantic
+pydantic>=2,<3
+pytest-playwright>=0.7.0
+playwright>=1.40.0

@@ -12,7 +12,7 @@ An AI-powered agent that aggregates customer pain points from Reddit, Twitter, a
 ## Getting Started
 
 ### Prerequisites
-- Python 3.10+
+- Python 3.11.x (project pinned to `langchain==0.0.340`; macOS users can bootstrap Miniforge and create `conda create -n cppagent-py311 python=3.11`)
 - Access credentials for Reddit, Twitter, Google Search APIs, and OpenAI
 
 ### Installation
@@ -37,3 +37,27 @@ pytest
 
 ## Project Structure
 Refer to `docs/architecture.md` for detailed architectural guidance.
+
+## **Reddit Tool Example**
+
+**Example Output File**: `examples/reddit_tool_example_output.json` — a saved, sanitized sample of `RedditTool` output.
+
+### Quick Run (debug) 
+Prints sanitized JSON to stdout. 
+```bash
+python scripts/run_reddit_tool_debug.py
+```
+### Quick Run (debug) With sample output
+```bash
+python scripts/run_reddit_tool_debug.py > examples/debug_output.json
+``` 
+### Quick Run (CLI) 
+```bash
+python scripts/run_reddit_tool_cli.py --query "python decorators" --subreddits python --limit 3 --per-subreddit 3 --time-filter week
+``` 
+
+**Usage Notes**: Ensure you have populated `.env` from `.env.example` with `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET`, and `REDDIT_USER_AGENT` before running the scripts.
+
+**Fields in the example output**: each item contains the following keys: `id`, `title`, `text`, `upvotes`, `comments`, `url`, `subreddit`, `timestamp`.
+
+See `examples/reddit_tool_example_output.json` for a concrete sample.

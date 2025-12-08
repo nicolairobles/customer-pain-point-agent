@@ -5,19 +5,32 @@ from __future__ import annotations
 from typing import Any, Dict, List
 
 from langchain.tools import BaseTool
+from pydantic import BaseModel, ConfigDict, Field
 
 from config.settings import Settings
+
+
+class TwitterToolInput(BaseModel):
+    """Input schema for TwitterTool."""
+
+    query: str = Field(..., description="Search query for relevant Twitter discussions.")
+
+    model_config = ConfigDict(extra="forbid")
 
 
 class TwitterTool(BaseTool):
     """Fetches relevant Twitter posts based on a user query."""
 
-    name = "twitter_search"
-    description = "Search Twitter for discussions related to customer pain points."
+    name: str = "twitter_search"
+    description: str = "Search Twitter for discussions related to customer pain points."
+    args_schema: type[BaseModel] = TwitterToolInput
+
+    settings: Any = None
 
     def __init__(self, settings: Settings) -> None:
-        super().__init__()
-        self.settings = settings
+        # Initialize pydantic/model fields via super().__init__ so assignment
+        # respects BaseTool's model semantics.
+        super().__init__(settings=settings)
         # Initialize Twitter client here when implementing
 
     @classmethod
