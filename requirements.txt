@@ -8,3 +8,5 @@ google-api-python-client
 python-dotenv
 pytest
 pydantic>=2,<3
+pytest-playwright>=0.7.0
+playwright>=1.40.0
