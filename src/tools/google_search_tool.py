@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from langchain.tools import BaseTool
-from pydantic import PrivateAttr
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
 
 from config.settings import Settings
 from src.tools.google_parser import normalize_google_result
@@ -17,11 +17,20 @@ from src.tools.google_parser import normalize_google_result
 _LOG = logging.getLogger(__name__)
 
 
+class GoogleSearchToolInput(BaseModel):
+    """Input schema for GoogleSearchTool."""
+
+    query: str = Field(..., description="Search query for Google Custom Search.")
+
+    model_config = ConfigDict(extra="forbid")
+
+
 class GoogleSearchTool(BaseTool):
     """Fetches relevant Google Search results based on a user query."""
 
     name: str = "google_search"
     description: str = "Search Google for discussions related to customer pain points."
+    args_schema: type[BaseModel] = GoogleSearchToolInput
 
     settings: Any = None
     _client: Any = PrivateAttr(default=None)
