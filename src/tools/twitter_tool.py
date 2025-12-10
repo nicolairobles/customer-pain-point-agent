@@ -21,8 +21,8 @@ _LOG = logging.getLogger(__name__)
 _URL_RE = re.compile(r'https?://\S+')
 _EMAIL_RE = re.compile(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b')
 _PHONE_RE = re.compile(
-    r'\b(?:\+?\d{1,3}[\s\-\.]?)?(?:\(?\d{3}\)?[\s\-\.]?)?\d{3}[\s\-\.]?\d{4}\b'
-)  # Improved phone number pattern: matches common formats, avoids dates
+    r'\b(?:\+?\d{1,3}[\s\-\.]+)?(?:\(?\d{3}\)?[\s\-\.]+)?\d{3}[\s\-\.]+\d{4}\b'
+)  # Improved phone number pattern: matches common formats, avoids dates by requiring at least one non-digit separator
 _MARKDOWN_UNSAFE_RE = re.compile(r'[|*_`~]')  # Characters that might break markdown
 
 
@@ -243,14 +243,19 @@ class TwitterAPIWrapper:
                 dt = tweet.created_at.astimezone(timezone.utc)
             timestamp = dt.isoformat()
         
+        # Extract public_metrics dict once
+        metrics = getattr(tweet, 'public_metrics', None)
+        if not isinstance(metrics, dict):
+            metrics = {}
+        
         return NormalizedTweet(
             text=sanitized_text,
             author_handle=author_handle,
             permalink=f"https://twitter.com/{author_handle}/status/{getattr(tweet, 'id', '')}",
             created_timestamp=timestamp,
-            like_count=getattr(tweet, 'public_metrics', {}).get("like_count", 0) if isinstance(getattr(tweet, 'public_metrics', None), dict) else 0,
-            repost_count=getattr(tweet, 'public_metrics', {}).get("retweet_count", 0) if isinstance(getattr(tweet, 'public_metrics', None), dict) else 0,
-            reply_count=getattr(tweet, 'public_metrics', {}).get("reply_count", 0) if isinstance(getattr(tweet, 'public_metrics', None), dict) else 0,
+            like_count=metrics.get("like_count", 0),
+            repost_count=metrics.get("retweet_count", 0),
+            reply_count=metrics.get("reply_count", 0),
             language=getattr(tweet, 'lang', '') or "",
             platform="twitter"
         )
@@ -293,7 +298,8 @@ class TwitterTool(BaseTool):
 
         # Log search request (masking any sensitive data)
         safe_query = query.replace('\n', ' ').replace('\r', ' ')[:100]  # Truncate and clean
-        _LOG.info(f"Twitter search initiated: query='{safe_query}'..., filters={kwargs}")
+        safe_filters = {k: kwargs.get(k) for k in ("max_results", "lang", "start_time", "end_time")}
+        _LOG.info(f"Twitter search initiated: query='{safe_query}'..., filters={safe_filters}")
 
         try:
             response = self._wrapper.search_tweets(

@@ -22,7 +22,8 @@ class DummyTweet:
         created_at,
         author_id,
         public_metrics=None,
-        lang="en"
+        lang="en",
+        referenced_tweets=None
     ):
         self.id = id
         self.text = text
@@ -35,6 +36,7 @@ class DummyTweet:
             "reply_count": 2
         }
         self.lang = lang
+        self.referenced_tweets = referenced_tweets
 
 
 class DummyUser:
