@@ -94,15 +94,9 @@ class TwitterAPIWrapper:
 
         try:
             self.client = tweepy.Client(bearer_token=bearer_token.strip())
-            # Test the connection with a minimal request
-            self.client.get_me()
-            _LOG.info("Twitter API authentication successful")
-        except tweepy.Unauthorized:
-            raise TwitterAPIError("Twitter API authentication failed: Invalid bearer token. Please check your TWITTER_API_KEY.")
-        except tweepy.Forbidden:
-            raise TwitterAPIError("Twitter API authentication failed: Access forbidden. Your bearer token may not have the required permissions.")
-        except tweepy.TweepyException as e:
-            raise TwitterAPIError(f"Twitter API authentication failed: {str(e)}")
+            # For bearer token authentication, we skip the API test during initialization
+            # to avoid rate limiting issues. Authentication will be tested on first actual API call.
+            _LOG.info("Twitter API client initialized with bearer token")
         except Exception as e:
             raise TwitterAPIError(f"Failed to initialize Twitter API client: {str(e)}")
 

@@ -516,18 +516,17 @@ def test_data_quality_schema_validation(mock_client_class):
 
 
 def test_twitter_api_authentication_failure(monkeypatch, settings):
-    """Test that authentication failures are handled properly."""
-    from src.tools.twitter_tool import TwitterAPIError
-    
-    # Mock tweepy client to raise authentication error
+    """Test that client initialization works even with invalid tokens (auth tested on first API call)."""
+    from src.tools.twitter_tool import TwitterAPIWrapper
+
+    # Mock tweepy client - initialization should succeed regardless of token validity
     mock_client = MagicMock()
-    mock_client.get_me.side_effect = Exception("401 Unauthorized")
-    
+
     monkeypatch.setattr("src.tools.twitter_tool.tweepy.Client", lambda bearer_token: mock_client)
-    
-    with pytest.raises(TwitterAPIError, match="Failed to initialize Twitter API client"):
-        from src.tools.twitter_tool import TwitterAPIWrapper
-        TwitterAPIWrapper("invalid_token")
+
+    # Should not raise an exception during initialization
+    wrapper = TwitterAPIWrapper("invalid_token")
+    assert wrapper.client == mock_client
 
 
 def test_twitter_api_rate_limit_retry_logic(monkeypatch, settings, caplog):
@@ -626,7 +625,7 @@ def test_twitter_api_wrapper_initialization_logging(monkeypatch, caplog):
         from src.tools.twitter_tool import TwitterAPIWrapper
         TwitterAPIWrapper("valid_token")
     
-    assert "Twitter API authentication successful" in caplog.text
+    assert "Twitter API client initialized with bearer token" in caplog.text
 
 
 def test_mutation_regression_test():
