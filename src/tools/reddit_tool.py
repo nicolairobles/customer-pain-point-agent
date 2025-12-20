@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import logging
 import os
+import random
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Dict, Iterable, List, Literal, Optional
@@ -115,6 +116,14 @@ class RedditTool(BaseTool):
             timeout=30,  # Request timeout in seconds
             ratelimit_seconds=300,  # Wait up to 5 min if rate limited
         )
+        self._client_kwargs = {
+            "client_id": client_id or "",
+            "client_secret": client_secret or "",
+            "user_agent": user_agent,
+            "check_for_async": False,
+            "timeout": 30,
+            "ratelimit_seconds": 300,
+        }
 
     @classmethod
     def from_settings(cls, settings: Settings) -> "RedditTool":
@@ -191,10 +200,26 @@ class RedditTool(BaseTool):
             _LOG.debug("Failed to stringify author object: %r", author_attr)
             return ""
 
-    def _fetch_subreddit(self, subreddit_name: str, query: str, limit: int, time_filter: Optional[str], retries: int = 4) -> List[Dict[str, Any]]:
+    def _reset_client(self) -> None:
+        try:
+            self._client = praw.Reddit(**self._client_kwargs)
+        except Exception:
+            # Best-effort; keep existing client if refresh fails.
+            pass
+
+    def _fetch_subreddit(
+        self,
+        subreddit_name: str,
+        query: str,
+        limit: int,
+        time_filter: Optional[str],
+        retries: int = 2,
+    ) -> List[Dict[str, Any]]:
         """Fetch search results for a single subreddit with retry/backoff.
         
-        Increased retries from 2 to 4 to handle rate-limited subreddits better.
+        We keep tool-level retries modest because PRAW/prawcore already retries
+        certain network failures internally. Excessive outer retries can turn
+        transient disconnects into multi-minute stalls.
         """
 
         attempt = 0
@@ -205,6 +230,8 @@ class RedditTool(BaseTool):
             # Small delay before each attempt to avoid overwhelming Reddit
             if attempt > 0:
                 _LOG.info("Retry attempt %d/%d for r/%s after %.1fs backoff", attempt, retries, subreddit_name, backoff)
+                # Add jitter to avoid synchronized retries across threads.
+                time.sleep(random.uniform(0.0, 0.35))
             try:
                 subreddit = self._client.subreddit(subreddit_name)
                 # Measure fetch duration to help detect slow or rate-limited calls.
@@ -231,12 +258,40 @@ class RedditTool(BaseTool):
                 return results
             except Exception as exc:
                 exc_str = str(exc).lower()
+                is_connection_abort = any(
+                    keyword in exc_str
+                    for keyword in [
+                        "remote end closed connection without response",
+                        "connection aborted",
+                        "remotedisconnected",
+                    ]
+                )
                 # Check if this is a rate limit or connection error that might benefit from retry
-                is_retryable = any(keyword in exc_str for keyword in ["rate", "limit", "429", "timeout", "connection"])
+                is_retryable = any(
+                    keyword in exc_str
+                    for keyword in [
+                        "rate",
+                        "limit",
+                        "429",
+                        "timeout",
+                        "connection",
+                        "remote end closed",
+                        "remotedisconnected",
+                        "connection aborted",
+                    ]
+                )
                 _LOG.warning(
                     "Error fetching r/%s (attempt %d/%d, retryable=%s): %s", 
                     subreddit_name, attempt + 1, retries + 1, is_retryable, exc
                 )
+                # When the server closes the connection without responding, prawcore
+                # has usually already retried; additional outer retries tend to
+                # amplify stalls. Fail fast so other sources (e.g., Google) can run.
+                if is_connection_abort:
+                    break
+
+                if is_retryable and any(keyword in exc_str for keyword in ["remote", "connection aborted", "remotedisconnected"]):
+                    self._reset_client()
                 attempt += 1
                 # If we've exhausted retries, avoid sleeping unnecessarily
                 # before exiting the loop.
@@ -387,7 +442,8 @@ class RedditTool(BaseTool):
         try:
             # Limit concurrent requests to avoid overwhelming Reddit's API
             # and causing connection exhaustion / rate limiting
-            max_workers = min(2, len(subreddits))
+            max_workers_env = int(os.getenv("REDDIT_MAX_WORKERS", "1") or "1")
+            max_workers = min(max(1, max_workers_env), len(subreddits))
             with ThreadPoolExecutor(max_workers=max_workers) as exc:
                 futures = {exc.submit(self._fetch_subreddit, s, query, per_subreddit, time_filter): s for s in subreddits}
                 for fut in as_completed(futures):
@@ -419,4 +475,3 @@ class RedditTool(BaseTool):
         """Async wrapper for LangChain compatibility; runs the sync implementation."""
 
         return self._run(query, *args, **kwargs)
-

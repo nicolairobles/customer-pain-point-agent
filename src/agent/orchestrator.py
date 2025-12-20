@@ -173,6 +173,8 @@ YOUR JOB:
 CRITICAL:
 - Use specific subreddits: {subreddits}
 - Call search tools to get real data.
+- Always call `google_search` at least once when available.
+- If a tool errors or returns no results, continue with the other tools.
 """
 
         # 3. Rebuild Research Agent
@@ -263,6 +265,17 @@ CRITICAL:
         metadata = research_result.get("metadata", {})
         counted_sources = max(total_sources, len(raw_items))
         metadata["total_sources_searched"] = metadata.get("total_sources_searched", 0) + counted_sources
+        metadata["used_tools"] = self.get_used_tools()
+        handler = self._telemetry_handler
+        if handler is not None:
+            metadata["tool_output_counts"] = dict(getattr(handler, "tool_output_counts", {}) or {})
+            metadata["tool_errors"] = list(getattr(handler, "tool_errors", []) or [])
+        if raw_items:
+            counts_by_platform: Dict[str, int] = {}
+            for item in raw_items:
+                platform = str(item.get("platform") or "unknown").strip() or "unknown"
+                counts_by_platform[platform] = counts_by_platform.get(platform, 0) + 1
+            metadata["tool_item_counts_by_platform"] = counts_by_platform
         
         final_result = {
             "input": input_query,
@@ -372,6 +385,8 @@ class _TelemetryCallbackHandler(BaseCallbackHandler):
 
         self._log = logging.getLogger(__name__)
         self.used_tools: set[str] = set()
+        self.tool_output_counts: dict[str, int] = {}
+        self.tool_errors: list[str] = []
 
     def on_tool_start(self, serialized: Dict[str, Any] | None = None, input_str: str | None = None, **kwargs: Any) -> None:
         tool_name = (serialized or {}).get("name", "<unknown>")
@@ -381,7 +396,25 @@ class _TelemetryCallbackHandler(BaseCallbackHandler):
             self.used_tools.add(str(tool_name))
 
     def on_tool_end(self, output: Any, **kwargs: Any) -> None:
-        self._log.info("tool_end output_type=%s", type(output).__name__)
+        count: int | None = None
+        if isinstance(output, list):
+            count = len(output)
+        elif isinstance(output, dict):
+            maybe_results = output.get("results") if hasattr(output, "get") else None
+            if isinstance(maybe_results, list):
+                count = len(maybe_results)
+
+        tool_name = str(kwargs.get("name") or kwargs.get("tool") or "<unknown>")
+        if tool_name != "<unknown>" and count is not None:
+            self.tool_output_counts[tool_name] = count
+
+        self._log.info("tool_end name=%s output_type=%s count=%s", tool_name, type(output).__name__, count)
+
+    def on_tool_error(self, error: BaseException, **kwargs: Any) -> None:  # type: ignore[override]
+        tool_name = str(kwargs.get("name") or kwargs.get("tool") or "<unknown>")
+        message = f"tool_error name={tool_name} error={type(error).__name__}: {error}"
+        self.tool_errors.append(message)
+        self._log.warning(message)
 
 
 def _summarize_input(input_str: Any) -> str:
