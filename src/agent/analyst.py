@@ -5,9 +5,6 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, List, Optional
 
-from langchain_core.messages import SystemMessage, HumanMessage
-from langchain_openai import ChatOpenAI
-
 from config.settings import Settings
 from src.agent.query_processor import QueryAnalysis
 
@@ -19,9 +16,19 @@ class Analyst:
 
     def __init__(self, settings: Settings, llm: Optional[Any] = None) -> None:
         self.settings = settings
+        self._init_error: Exception | None = None
         if llm:
             self.llm = llm
         else:
+            try:
+                from langchain_openai import ChatOpenAI  # type: ignore
+            except Exception as exc:  # pragma: no cover - environment specific
+                # Defer failure until `review()` is called so unit tests can stub
+                # the analyst without requiring langchain-openai to import cleanly.
+                self.llm = None
+                self._init_error = exc
+                return
+
             self.llm = ChatOpenAI(
                 api_key=settings.api.openai_api_key,
                 model=settings.llm.model,
@@ -40,6 +47,18 @@ class Analyst:
         Returns:
             A synthesized markdown response.
         """
+
+        if getattr(self, "llm", None) is None:
+            raise ImportError(
+                "Analyst LLM is unavailable (langchain-openai import failed)."
+            ) from self._init_error
+
+        try:
+            from langchain_core.messages import SystemMessage, HumanMessage  # type: ignore
+        except Exception as exc:  # pragma: no cover - environment specific
+            raise ImportError(
+                "LangChain message classes are not available. Install `langchain` to enable analyst synthesis."
+            ) from exc
         
         system_prompt = f"""You are a Senior Data Analyst reviewing raw search results to identify customer pain points.
 

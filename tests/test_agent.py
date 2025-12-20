@@ -451,3 +451,19 @@ def test_telemetry_logging_sanitizes_input(caplog: pytest.LogCaptureFixture) -> 
     # Ensure sensitive values are not logged.
     assert all("should_not_show" not in msg for msg in messages)
     assert any("tool_end" in msg and "dict" in msg for msg in messages)
+
+
+def test_cap_tool_items_limits_per_platform_and_total() -> None:
+    """Tool payload caps should limit per-platform and global counts deterministically."""
+
+    items: list[dict[str, Any]] = []
+    for idx in range(10):
+        items.append({"platform": "reddit", "url": f"https://reddit.com/{idx}"})
+    for idx in range(10):
+        items.append({"platform": "google_search", "url": f"https://example.com/{idx}"})
+
+    capped = orchestrator._cap_tool_items(items, max_per_platform=3, max_total=5)
+
+    assert len(capped) == 5
+    assert sum(1 for item in capped if item.get("platform") == "reddit") == 3
+    assert sum(1 for item in capped if item.get("platform") == "google_search") == 2

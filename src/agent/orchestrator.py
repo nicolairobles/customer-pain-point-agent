@@ -197,6 +197,10 @@ CRITICAL:
         )
 
         raw_items = _collect_tool_items(research_result) if isinstance(research_result, Mapping) else []
+        if raw_items:
+            max_per_platform = max(1, int(getattr(self._settings.agent, "max_results_per_source", 10)))
+            max_total = max_per_platform * max(1, len(self._tools))
+            raw_items = _cap_tool_items(raw_items, max_per_platform=max_per_platform, max_total=max_total)
         
         # Robustly extract research output & stats
         # Case A: Legacy AgentExecutor (returns 'output' and 'intermediate_steps')
@@ -459,6 +463,38 @@ def _collect_tool_items(result: Mapping[str, Any]) -> List[Mapping[str, Any]]:
                         collected.append(item)
 
     return collected
+
+
+def _cap_tool_items(
+    items: Sequence[Mapping[str, Any]],
+    *,
+    max_per_platform: int,
+    max_total: int,
+) -> List[Mapping[str, Any]]:
+    """Apply global safety caps to tool outputs.
+
+    This prevents the agent from returning/processing excessive tool payloads
+    when the model loops or requests large result sets. Items are kept in their
+    original order.
+    """
+
+    max_per_platform = max(1, int(max_per_platform))
+    max_total = max(1, int(max_total))
+
+    kept: List[Mapping[str, Any]] = []
+    counts: Dict[str, int] = {}
+
+    for item in items:
+        if len(kept) >= max_total:
+            break
+        platform = str(item.get("platform") or "unknown").strip() or "unknown"
+        current = counts.get(platform, 0)
+        if current >= max_per_platform:
+            continue
+        counts[platform] = current + 1
+        kept.append(item)
+
+    return kept
 
 
 def _extract_structured_pain_points(items: Sequence[Mapping[str, Any]]) -> List[Dict[str, Any]]:

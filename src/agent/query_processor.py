@@ -6,9 +6,6 @@ import json
 from typing import Any, Dict, List, Optional
 from dataclasses import dataclass, asdict
 
-from langchain_core.messages import SystemMessage, HumanMessage
-from langchain_openai import ChatOpenAI
-
 from config.settings import Settings
 
 
@@ -33,6 +30,13 @@ class QueryProcessor:
         if llm:
             self.llm = llm
         else:
+            try:
+                from langchain_openai import ChatOpenAI  # type: ignore
+            except Exception as exc:  # pragma: no cover - environment specific
+                raise ImportError(
+                    "ChatOpenAI is not available. Install the `langchain-openai` package to enable query processing."
+                ) from exc
+
             self.llm = ChatOpenAI(
                 api_key=settings.api.openai_api_key,
                 model=settings.llm.model,
@@ -43,6 +47,13 @@ class QueryProcessor:
 
     def analyze(self, query: str) -> QueryAnalysis:
         """Analyze the user query and extract search parameters."""
+
+        try:
+            from langchain_core.messages import SystemMessage, HumanMessage  # type: ignore
+        except Exception as exc:  # pragma: no cover - environment specific
+            raise ImportError(
+                "LangChain message classes are not available. Install `langchain` to enable query processing."
+            ) from exc
         
         system_prompt = """You are an expert researcher planning a search strategy for customer pain points.
         
