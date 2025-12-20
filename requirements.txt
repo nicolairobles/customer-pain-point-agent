@@ -2,7 +2,6 @@ langchain>=1.0.7,<2
 openai
 streamlit
 praw
-tweepy
 google-api-python-client
 python-dotenv
 pytest

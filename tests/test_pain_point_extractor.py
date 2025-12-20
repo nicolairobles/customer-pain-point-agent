@@ -43,10 +43,10 @@ def test_extract_pain_points_returns_expected_models() -> None:
             "content": "The dashboard crashes whenever I filter by date.",
         },
         {
-            "platform": "twitter",
+            "platform": "google_search",
             "author": "user-b",
             "timestamp": "2025-11-18T11:00:00Z",
-            "url": "https://twitter.com/example/status/1",
+            "url": "https://example.com/search/result/1",
             "content": "Filtering by date produces 500 errors repeatedly.",
         },
     ]
@@ -69,8 +69,8 @@ def test_extract_pain_points_returns_expected_models() -> None:
                         "author": "user-a",
                     },
                     {
-                        "platform": "twitter",
-                        "url": "https://twitter.com/example/status/1",
+                        "platform": "google_search",
+                        "url": "https://example.com/search/result/1",
                         "timestamp": "2025-11-18T11:00:00Z",
                         "author": "user-b",
                     },
@@ -164,7 +164,7 @@ def test_extract_pain_points_continues_after_service_error() -> None:
 def test_deduplicate_pain_points_merges_and_updates_frequency() -> None:
     base_sources = [
         PainPointSource(platform="reddit", url="url1", timestamp="2024-01-01T00:00:00Z", author="user-a"),
-        PainPointSource(platform="twitter", url="url2", timestamp="2024-01-02T00:00:00Z", author="user-b"),
+        PainPointSource(platform="google_search", url="url2", timestamp="2024-01-02T00:00:00Z", author="user-b"),
     ]
 
     point_a = PainPoint(
@@ -240,5 +240,4 @@ def test_extract_pain_points_batches_large_dataset() -> None:
 
     extract_pain_points(documents, service=fake_service, batch_size=10)
     assert fake_service.calls == batches_needed
-
 

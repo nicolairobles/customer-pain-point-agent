@@ -47,7 +47,7 @@ SAMPLE_RESULTS = {
             ),
             "frequency": "high (qualitative)",
             "examples": ["Where do I see usage per team?", "Invoice split between sandboxes is confusing"],
-            "sources": [{"platform": "Twitter", "url": "https://twitter.com/example/status/123"}],
+            "sources": [{"platform": "Google Search", "url": "https://example.com/discussion/123"}],
         },
     ],
     "metadata": {
@@ -72,4 +72,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

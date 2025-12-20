@@ -18,8 +18,6 @@ class APISettings:
     openai_api_key: str = os.getenv("OPENAI_API_KEY", "")
     reddit_client_id: str = os.getenv("REDDIT_CLIENT_ID", "")
     reddit_client_secret: str = os.getenv("REDDIT_CLIENT_SECRET", "")
-    twitter_api_key: str = os.getenv("TWITTER_API_KEY", "")
-    twitter_api_secret: str = os.getenv("TWITTER_API_SECRET", "")
     google_search_api_key: str = os.getenv("GOOGLE_SEARCH_API_KEY", "")
     google_search_engine_id: str = os.getenv("GOOGLE_SEARCH_ENGINE_ID", "")
 
@@ -61,7 +59,6 @@ class ToolSettings:
     """Feature flags for enabling/disabling individual tools."""
 
     reddit_enabled: bool = os.getenv("TOOL_REDDIT_ENABLED", "true").lower() == "true"
-    twitter_enabled: bool = os.getenv("TOOL_TWITTER_ENABLED", "true").lower() == "true"
     google_search_enabled: bool = os.getenv("TOOL_GOOGLE_SEARCH_ENABLED", "true").lower() == "true"
 
 

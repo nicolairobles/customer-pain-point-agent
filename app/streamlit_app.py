@@ -46,7 +46,7 @@ def main() -> None:
             return
 
         try:
-            with st.spinner("Gathering insights from Reddit, Twitter, and Google..."):
+            with st.spinner("Gathering insights from Reddit and Google..."):
                 results = run_agent(query)
         except ImportError as exc:
             st.error(

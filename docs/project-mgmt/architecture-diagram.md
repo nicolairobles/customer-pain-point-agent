@@ -15,18 +15,18 @@ Below is an ASCII diagram with more technical detail, including specific librari
          | (LangChain Agent  |
          |  or LangGraph)    |
          +----+----+----+----+
-              |    |    |
-     +--------+    |    +--------+
-     |             |             |
-     v             v             v
- +--------+   +--------+   +-------------+
- |Reddit  |   |Twitter |   | Google      |
- |API Tool|   |API Tool|   | Search Tool |
- |(PRAW/  |   |tweepy/ |   | SerpAPI/    |
- | async  |   | snscrape)| | Google API) |
- +---+----+   +---+----+   +------+------+ 
-     |            |              |
-     +-----+------+--------------+
+              |    |
+     +--------+    +--------+
+     |                 |
+     v                 v
+ +--------+       +-------------+
+ |Reddit  |       | Google      |
+ |API Tool|       | Search Tool |
+ |(PRAW/  |       | Google API) |
+ | async  |       |             |
+ +---+----+       +------+------+ 
+     |                 |
+     +--------+--------+
            |
            v
    +--------------------------+
@@ -54,8 +54,7 @@ Below is an ASCII diagram with more technical detail, including specific librari
 - Streamlit: UI framework
 - LangChain or LangGraph: Agent orchestration and tool management
 - PRAW: Reddit API wrapper
-- Tweepy/snscrape: Twitter API/search
-- SerpAPI/Google API: Google Search
+- Google API: Google Search
 - OpenAI LLM: Pain point extraction
 - Pydantic: Data validation/structuring
 

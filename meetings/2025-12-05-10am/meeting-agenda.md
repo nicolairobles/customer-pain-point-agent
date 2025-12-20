@@ -20,10 +20,9 @@
 - Current blockers discussion
 
 ### 3. Critical Path Items (15 min)
-- **Twitter Tool Implementation** (Priority: HIGH)
-  - Assign owner
-  - Verify API credentials
-  - Estimate timeline
+- **Source strategy update** (Priority: HIGH)
+  - Twitter/X removed from scope due to API limits
+  - Confirm we proceed with Reddit + Google Search (or pick a replacement source)
   
 - **Google Search Integration** (Priority: HIGH)
   - Assign owner
@@ -41,7 +40,7 @@
 - Set milestones for next 2-3 weeks
 
 ### 5. Risk Discussion (5 min)
-- Twitter API access concerns
+- Google Search API access concerns
 - Integration complexity
 - Holiday season impact
 - API cost monitoring
