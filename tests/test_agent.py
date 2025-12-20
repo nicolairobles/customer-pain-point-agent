@@ -9,6 +9,7 @@ from typing import Any
 import pytest
 
 from config.settings import AgentSettings, Settings, ToolSettings
+from config.settings import APISettings
 from src.agent import orchestrator, pain_point_agent
 from src.utils.validators import ValidationError
 
@@ -467,3 +468,56 @@ def test_cap_tool_items_limits_per_platform_and_total() -> None:
     assert len(capped) == 5
     assert sum(1 for item in capped if item.get("platform") == "reddit") == 3
     assert sum(1 for item in capped if item.get("platform") == "google_search") == 2
+
+
+def test_agent_invocation_aggregates_multiple_tool_outputs(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Integration-style test: agent invocation aggregates results from multiple tools."""
+
+    call_log: dict[str, Any] = {}
+    _install_fake_langchain(monkeypatch, call_log)
+
+    class FakeReactAgent:
+        def __init__(self, tools=None):
+            self.tools = tools or []
+
+        def invoke(self, payload: dict[str, Any], config: dict[str, Any] | None = None) -> dict[str, Any]:
+            del payload, config
+            # Simulate sequential tool calls by returning intermediate_steps with observations.
+            return {
+                "intermediate_steps": [
+                    (types.SimpleNamespace(tool="reddit_search"), [{"platform": "reddit", "url": "https://reddit.com/1"}]),
+                    (
+                        types.SimpleNamespace(tool="google_search"),
+                        [{"platform": "google_search", "url": "https://example.com/1"}],
+                    ),
+                ]
+            }
+
+    def fake_create_react_agent(llm=None, model=None, tools=None, prompt=None):
+        del llm, model, prompt
+        return FakeReactAgent(tools=tools)
+
+    monkeypatch.setitem(sys.modules, "langchain.agents", types.SimpleNamespace(create_react_agent=fake_create_react_agent))
+
+    class DummyLLM:
+        _llm_type = "dummy"
+
+    dummy_tools = [types.SimpleNamespace(name="reddit_search"), types.SimpleNamespace(name="google_search")]
+    monkeypatch.setattr(orchestrator, "_build_llm", lambda settings: DummyLLM())
+    monkeypatch.setattr(orchestrator, "_load_tools", lambda settings: dummy_tools)
+
+    settings = Settings(api=APISettings(openai_api_key=""), agent=AgentSettings(max_results_per_source=10))
+    executor = orchestrator.build_agent_executor(settings)
+
+    from src.agent.query_processor import QueryAnalysis
+
+    executor._query_processor.analyze = lambda q: QueryAnalysis(  # type: ignore[attr-defined]
+        refined_query=q, search_terms=["hello"], subreddits=["python"], context_notes=""
+    )
+    executor._analyst.review = lambda _analysis, _research_output: "final"  # type: ignore[attr-defined]
+
+    result = executor.invoke({"input": "hello"})
+
+    platform_counts = result.get("metadata", {}).get("tool_item_counts_by_platform", {})
+    assert platform_counts.get("reddit") == 1
+    assert platform_counts.get("google_search") == 1
