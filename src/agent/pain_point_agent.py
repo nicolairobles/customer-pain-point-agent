@@ -124,6 +124,7 @@ def _normalize_response(
     response: Dict[str, Any] = {
         "query": normalized_query,
         "pain_points": pain_points,
+        "output": raw_result.get("output") if isinstance(raw_result, Mapping) else None,
         "metadata": normalized_metadata,
     }
     if normalized_error:

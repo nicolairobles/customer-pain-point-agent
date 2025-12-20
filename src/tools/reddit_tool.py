@@ -29,26 +29,29 @@ from src.tools.reddit_parser import normalize_submission
 class RedditToolInput(BaseModel):
     """Input schema for RedditTool."""
 
-    query: str = Field(..., description="Search query to run against Reddit.")
+    query: str = Field(
+        ..., 
+        description="The exact search terms from the user's question. Pass the user's query directly without modification."
+    )
     subreddits: List[str] = Field(
-        default_factory=lambda: ["all"],
-        description="One or more subreddit names to search (defaults to 'all').",
+        default_factory=lambda: ["smallbusiness", "Entrepreneur", "startups", "CustomerService", "BusinessTips", "SaaS"],
+        description="One or more subreddit names to search. Use specific, topic-relevant subreddits to get better quality results.",
     )
     limit: int = Field(
-        15,
+        10,
         ge=1,
         le=20,
         description="Total number of posts to return across subreddits (capped at 20).",
     )
     per_subreddit: int = Field(
-        10,
+        5,
         ge=1,
         le=25,
         description="Posts to fetch per subreddit before merging and deduping.",
     )
     time_filter: Optional[Literal["hour", "day", "week", "month", "year", "all"]] = Field(
-        None,
-        description="Optional Reddit time filter window.",
+        "month",
+        description="Reddit time filter window. Defaults to 'month' for relevant recent content.",
     )
 
     model_config = ConfigDict(extra="forbid")
@@ -64,6 +67,13 @@ class RedditToolInput(BaseModel):
 
 _LOG = logging.getLogger(__name__)
 
+# Relevance filtering constants
+MIN_QUERY_LENGTH = 2  # Queries shorter than this bypass filtering
+MIN_TERM_LENGTH = 2   # Query terms shorter than this are ignored
+
+# Retry configuration constants
+BACKOFF_MULTIPLIER = 1.5  # Multiplier for exponential backoff between retries
+
 
 class RedditTool(BaseTool):
     """Fetches relevant Reddit posts based on a user query.
@@ -74,7 +84,11 @@ class RedditTool(BaseTool):
     """
 
     name: str = "reddit_search"
-    description: str = "Search Reddit for discussions related to customer pain points."
+    description: str = (
+        "Search Reddit for posts matching a specific query. "
+        "The 'query' parameter MUST be the user's actual search terms - pass them exactly as provided. "
+        "Returns posts with title, body, author, subreddit, and engagement metrics."
+    )
     args_schema: type[BaseModel] = RedditToolInput
 
     settings: Any = None
@@ -91,12 +105,15 @@ class RedditTool(BaseTool):
         if not client_id or not client_secret:
             _LOG.warning("Reddit credentials not provided in settings; client will still be created but may fail on use.")
 
-        # Initialize PRAW Reddit client
+        # Initialize PRAW Reddit client with timeout and rate limit settings
+        # to prevent connection exhaustion during rapid agent calls
         self._client = praw.Reddit(
             client_id=client_id or "",
             client_secret=client_secret or "",
             user_agent=user_agent,
             check_for_async=False,
+            timeout=30,  # Request timeout in seconds
+            ratelimit_seconds=300,  # Wait up to 5 min if rate limited
         )
 
     @classmethod
@@ -174,12 +191,20 @@ class RedditTool(BaseTool):
             _LOG.debug("Failed to stringify author object: %r", author_attr)
             return ""
 
-    def _fetch_subreddit(self, subreddit_name: str, query: str, limit: int, time_filter: Optional[str], retries: int = 2) -> List[Dict[str, Any]]:
-        """Fetch search results for a single subreddit with simple retry/backoff."""
+    def _fetch_subreddit(self, subreddit_name: str, query: str, limit: int, time_filter: Optional[str], retries: int = 4) -> List[Dict[str, Any]]:
+        """Fetch search results for a single subreddit with retry/backoff.
+        
+        Increased retries from 2 to 4 to handle rate-limited subreddits better.
+        """
 
         attempt = 0
-        backoff = 0.5
+        # Start with a longer backoff to respect Reddit rate limits
+        # This helps avoid connection exhaustion during rapid agent calls
+        backoff = 2.0
         while attempt <= retries:
+            # Small delay before each attempt to avoid overwhelming Reddit
+            if attempt > 0:
+                _LOG.info("Retry attempt %d/%d for r/%s after %.1fs backoff", attempt, retries, subreddit_name, backoff)
             try:
                 subreddit = self._client.subreddit(subreddit_name)
                 # Measure fetch duration to help detect slow or rate-limited calls.
@@ -189,8 +214,8 @@ class RedditTool(BaseTool):
                 # Hand off PRAW objects to the parsing helper which fulfils the
                 # sanitisation acceptance criteria for story 1.2.3.
                 results = [normalize_submission(s) for s in submissions]
-                _LOG.debug(
-                    "Fetched %d items from r/%s in %.2f seconds",
+                _LOG.info(
+                    "Successfully fetched %d items from r/%s in %.2f seconds",
                     len(results), subreddit_name, t1 - t0,
                 )
 
@@ -205,7 +230,13 @@ class RedditTool(BaseTool):
 
                 return results
             except Exception as exc:
-                _LOG.warning("Error fetching r/%s (attempt %d/%d): %s", subreddit_name, attempt + 1, retries + 1, exc)
+                exc_str = str(exc).lower()
+                # Check if this is a rate limit or connection error that might benefit from retry
+                is_retryable = any(keyword in exc_str for keyword in ["rate", "limit", "429", "timeout", "connection"])
+                _LOG.warning(
+                    "Error fetching r/%s (attempt %d/%d, retryable=%s): %s", 
+                    subreddit_name, attempt + 1, retries + 1, is_retryable, exc
+                )
                 attempt += 1
                 # If we've exhausted retries, avoid sleeping unnecessarily
                 # before exiting the loop.
@@ -213,16 +244,96 @@ class RedditTool(BaseTool):
                     break
 
                 time.sleep(backoff)
-                backoff *= 2
+                backoff *= BACKOFF_MULTIPLIER  # Multiplicative backoff: 2s -> 3s -> 4.5s -> 6.75s
 
-        _LOG.error("Failed to fetch subreddit %s after %d attempts", subreddit_name, retries + 1)
+        _LOG.error("Failed to fetch subreddit r/%s after %d attempts - posts from this subreddit will be skipped", subreddit_name, retries + 1)
         return []
 
-    def _merge_and_sort(self, lists: Iterable[List[Dict[str, Any]]], total_limit: int) -> List[Dict[str, Any]]:
-        """Merge results from multiple subreddits, dedupe by `id`, and sort by relevance."""
+    def _check_relevance(self, post: Dict[str, Any], query: str) -> bool:
+        """Check if a post is relevant to the search query using weighted scoring.
+        
+        Uses a weighted scoring system:
+        - Generic terms (api, error, bug, etc.) get weight 1
+        - Specific/primary terms get weight 3
+        - Posts must score >= 3 (at least one primary term) to pass
+        
+        This prevents generic API posts from matching queries about specific APIs.
+        """
+        if not query or len(query) < MIN_QUERY_LENGTH:
+            # For very short or empty queries, accept all posts
+            return True
+        
+        # Generic terms that are common across many topics
+        GENERIC_TERMS = {
+            "api", "apis", "issue", "issues", "problem", "problems",
+            "error", "errors", "bug", "bugs", "help", "question",
+            "code", "coding", "dev", "developer", "developers",
+            "calling", "call", "use", "using", "used",
+            "pain", "point", "points", "report", "reports",
+            "when", "how", "what", "why", "the", "and", "for",
+        }
+        
+        # Extract query terms (simple tokenization)
+        query_lower = query.lower()
+        query_terms = [term for term in query_lower.split() if len(term) > MIN_TERM_LENGTH]
+        
+        # If no meaningful terms, accept the post
+        if not query_terms:
+            return True
+        
+        # Separate primary (specific) and generic terms
+        primary_terms = [t for t in query_terms if t not in GENERIC_TERMS]
+        generic_terms = [t for t in query_terms if t in GENERIC_TERMS]
+        
+        # Get post content
+        title = (post.get("title") or "").lower()
+        text = (post.get("text") or "").lower()
+        combined_text = f"{title} {text}"
+        
+        # Calculate weighted score
+        score = 0
+        matched_primary = []
+        matched_generic = []
+        
+        for term in primary_terms:
+            if term in combined_text:
+                score += 3  # Primary terms are worth 3 points
+                matched_primary.append(term)
+        
+        for term in generic_terms:
+            if term in combined_text:
+                score += 1  # Generic terms are worth 1 point
+                matched_generic.append(term)
+        
+        # Require at least one primary term match (score >= 3)
+        # OR if there are no primary terms in query, require all generic terms
+        if primary_terms:
+            is_relevant = score >= 3  # At least one primary term matched
+        else:
+            # No primary terms in query - fall back to old behavior
+            is_relevant = score > 0
+        
+        if not is_relevant:
+            _LOG.debug(
+                "Relevance check failed for '%s': score=%d, primary=%s, generic=%s",
+                (post.get("title") or "")[:40], score, matched_primary, matched_generic
+            )
+        
+        return is_relevant
+
+    def _merge_and_sort(self, lists: Iterable[List[Dict[str, Any]]], total_limit: int, query: str = "") -> List[Dict[str, Any]]:
+        """Merge results from multiple subreddits, dedupe by `id`, filter by relevance, and sort.
+        
+        Args:
+            lists: Lists of posts from different subreddits
+            total_limit: Maximum number of posts to return
+            query: Search query used to filter for relevance
+        """
 
         seen = set()
         merged: List[Dict[str, Any]] = []
+        filtered_count = 0
+        
         for lst in lists:
             for item in lst:
                 item_id = item.get("id")
@@ -236,8 +347,17 @@ class RedditTool(BaseTool):
                 if item_id in seen:
                     continue
 
+                # Check relevance to query
+                if query and not self._check_relevance(item, query):
+                    filtered_count += 1
+                    _LOG.debug("Filtered out irrelevant post: %s", item.get("title", "")[:60])
+                    continue
+
                 seen.add(item_id)
                 merged.append(item)
+
+        if filtered_count > 0:
+            _LOG.info("Filtered out %d posts that were not relevant to query", filtered_count)
 
         # Relevance: upvotes + comments (simple heuristic)
         merged.sort(key=lambda x: (x.get("upvotes", 0) + x.get("comments", 0)), reverse=True)
@@ -247,21 +367,28 @@ class RedditTool(BaseTool):
         self,
         query: str,
         subreddits: Optional[List[str]] = None,
-        limit: int = 15,
-        per_subreddit: int = 10,
+        limit: int = 10,
+        per_subreddit: int = 5,
         time_filter: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """Synchronously execute the tool and return normalized search results."""
 
-        subreddits = subreddits or ["all"]
+        # Use specific subreddits by default to avoid rate limits on r/all
+        # Expanded list provides more diversity and reduces over-reliance on same subreddits
+        subreddits = subreddits or ["smallbusiness", "Entrepreneur", "startups", "CustomerService", "BusinessTips", "SaaS"]
         total_limit = max(1, min(int(limit), 20))
         per_subreddit = max(1, min(int(per_subreddit), 25))
+        # PRAW rejects None; default to a conservative window if not provided.
+        time_filter = time_filter or "week"
 
         start = time.time()
         results_by_sub: List[List[Dict[str, Any]]] = []
 
         try:
-            with ThreadPoolExecutor(max_workers=min(8, len(subreddits))) as exc:
+            # Limit concurrent requests to avoid overwhelming Reddit's API
+            # and causing connection exhaustion / rate limiting
+            max_workers = min(2, len(subreddits))
+            with ThreadPoolExecutor(max_workers=max_workers) as exc:
                 futures = {exc.submit(self._fetch_subreddit, s, query, per_subreddit, time_filter): s for s in subreddits}
                 for fut in as_completed(futures):
                     try:
@@ -269,9 +396,20 @@ class RedditTool(BaseTool):
                     except Exception as exc:  # pragma: no cover - defensive
                         _LOG.exception("Unhandled exception while fetching subreddit: %s", exc)
 
-            merged = self._merge_and_sort(results_by_sub, total_limit)
+            merged = self._merge_and_sort(results_by_sub, total_limit, query)
             duration = time.time() - start
             _LOG.info("RedditTool: returning %d posts in %.2f seconds", len(merged), duration)
+            
+            # Log post titles for debugging/verification
+            if merged:
+                _LOG.info("RedditTool posts returned:")
+                for i, post in enumerate(merged[:5], 1):  # Log first 5 posts
+                    title = post.get("title", "")[:80]
+                    subreddit = post.get("subreddit", "unknown")
+                    _LOG.info("  %d. [r/%s] %s", i, subreddit, title)
+                if len(merged) > 5:
+                    _LOG.info("  ... and %d more posts", len(merged) - 5)
+            
             return merged
         except Exception as exc:
             _LOG.exception("RedditTool encountered an unexpected error: %s", exc)

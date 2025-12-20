@@ -30,7 +30,7 @@ class AgentSettings:
     source_timeout_seconds: int = int(os.getenv("SOURCE_TIMEOUT_SECONDS", "30"))
     total_timeout_seconds: int = int(os.getenv("TOTAL_TIMEOUT_SECONDS", "120"))
     cache_enabled: bool = os.getenv("CACHE_ENABLED", "true").lower() == "true"
-    max_iterations: int = int(os.getenv("AGENT_MAX_ITERATIONS", "5"))
+    max_iterations: int = int(os.getenv("AGENT_MAX_ITERATIONS", "15"))
     verbose: bool = os.getenv("AGENT_VERBOSE", "false").lower() == "true"
 
 

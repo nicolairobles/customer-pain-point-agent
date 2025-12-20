@@ -1,5 +1,6 @@
 langchain>=1.0.7,<2
 openai
+langchain-openai
 streamlit
 praw
 google-api-python-client
