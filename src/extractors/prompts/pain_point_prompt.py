@@ -13,7 +13,7 @@ from textwrap import indent
 from typing import Iterable, List, Mapping, Sequence
 
 # Prompt versioning helps with auditability. Increment when intent/schema change.
-PAIN_POINT_PROMPT_VERSION = "1.1.0"
+PAIN_POINT_PROMPT_VERSION = "1.2.0"
 
 
 def format_documents_for_prompt(documents: Iterable[Mapping[str, str]]) -> str:
@@ -69,7 +69,8 @@ class PainPointPrompt:
           "timestamp": "ISO-8601 string",
           "author": "string"
         }
-      ]
+      ],
+      "relevance": 0.0
     }
   ],
   "analysis_notes": {

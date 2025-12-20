@@ -99,6 +99,7 @@ def test_extract_pain_points_returns_expected_models() -> None:
     assert isinstance(point, PainPoint)
     assert point.frequency == "medium"
     assert point.sentiment == "negative"
+    assert point.relevance == 0.7
     assert len(point.sources) == 2
 
 

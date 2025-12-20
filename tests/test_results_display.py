@@ -35,6 +35,7 @@ def test_normalize_pain_points_populates_defaults() -> None:
                 "name": "Slow Reports",
                 "description": "The reporting dashboard is slow when exporting data." * 10,
                 "frequency": 12,
+                "relevance": 0.85,
                 "examples": ["Export takes >5 minutes", "Timeout errors in Safari"],
                 "sources": [
                     {"platform": "Reddit", "url": "https://reddit.com/example"},
@@ -49,6 +50,7 @@ def test_normalize_pain_points_populates_defaults() -> None:
 
     assert normalized[0].title == "Slow Reports"
     assert normalized[0].frequency_label == "Frequency: 12"
+    assert normalized[0].relevance_label == "Relevance: 0.85"
     assert len(normalized[0].summary) <= 280
     assert normalized[0].examples == ["Export takes >5 minutes", "Timeout errors in Safari"]
     assert normalized[0].citations == ["[Reddit](https://reddit.com/example)", r"Support Ticket \#42"]
@@ -56,6 +58,7 @@ def test_normalize_pain_points_populates_defaults() -> None:
     assert normalized[1].title == "Pain Point 2"
     assert normalized[1].summary.startswith("No description provided")
     assert normalized[1].frequency_label == "Frequency: not provided"
+    assert normalized[1].relevance_label == "Relevance: not provided"
     assert normalized[1].examples == []
     assert normalized[1].citations == []
 

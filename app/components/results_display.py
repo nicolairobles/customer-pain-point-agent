@@ -54,6 +54,13 @@ _RESULTS_STYLE = """
     font-size: 0.82rem;
     color: var(--color-text-secondary);
 }
+.pp-card .pp-relevance {
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-size: 0.82rem;
+    color: var(--color-accent);
+}
 .pp-card ul {
     margin: 0 0 8px 18px;
 }
@@ -89,6 +96,7 @@ class PainPointDisplay:
     title: str
     summary: str
     frequency_label: str
+    relevance_label: str
     examples: List[str]
     citations: List[str]
 
@@ -153,6 +161,7 @@ def normalize_pain_points(pain_points: Iterable[Dict[str, Any]]) -> List[PainPoi
         title = raw.get("name") or f"Pain Point {idx + 1}"
         description = raw.get("description") or "No description provided."
         frequency = raw.get("frequency")
+        relevance = raw.get("relevance")
 
         if frequency in (None, "", 0):
             frequency_label = "Frequency: not provided"
@@ -160,6 +169,13 @@ def normalize_pain_points(pain_points: Iterable[Dict[str, Any]]) -> List[PainPoi
             frequency_label = f"Frequency: {frequency}"
         else:
             frequency_label = f"Frequency: {frequency}"
+
+        if relevance in (None, "", 0):
+            relevance_label = "Relevance: not provided"
+        elif isinstance(relevance, (int, float)):
+            relevance_label = f"Relevance: {relevance:.2f}"
+        else:
+            relevance_label = f"Relevance: {relevance}"
 
         examples = [example.strip() for example in raw.get("examples", []) if str(example).strip()]
 
@@ -174,6 +190,7 @@ def normalize_pain_points(pain_points: Iterable[Dict[str, Any]]) -> List[PainPoi
                 title=title,
                 summary=truncate_description(description, max_length=280),
                 frequency_label=frequency_label,
+                relevance_label=relevance_label,
                 examples=examples,
                 citations=citations,
             )
@@ -233,10 +250,8 @@ def render_results(results: Dict[str, Any]) -> None:
             if stat.help_text:
                 column.caption(stat.help_text)
 
-    # Display Analyst Report if available
     if results.get("output"):
         st.subheader("Analyst Report")
-        # Ensure the output is treated as a string
         st.markdown(str(results["output"]))
 
     if pain_points:
@@ -248,11 +263,13 @@ def render_results(results: Dict[str, Any]) -> None:
             with tab:
                 summary_html = html.escape(pain_point.summary)
                 frequency_html = html.escape(pain_point.frequency_label)
+                relevance_html = html.escape(pain_point.relevance_label)
                 st.markdown(
                     f"""
                     <div class="pp-card">
                         <p>{summary_html}</p>
                         <p class="pp-frequency">{frequency_html}</p>
+                        <p class="pp-relevance">{relevance_html}</p>
                     </div>
                     """,
                     unsafe_allow_html=True,
@@ -267,4 +284,3 @@ def render_results(results: Dict[str, Any]) -> None:
                     st.markdown("**Source Citations**")
                     for citation in pain_point.citations:
                         st.markdown(f"- {citation}")
-
