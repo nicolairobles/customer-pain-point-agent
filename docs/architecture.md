@@ -3,7 +3,7 @@
 ## High-Level Flow
 1. Streamlit UI collects user query.
 2. Agent orchestrator validates input and dispatches LangChain tools.
-3. Reddit, Twitter, and Google Search tools fetch raw conversational data.
+3. Reddit and Google Search tools fetch raw conversational data.
 4. Extractor module aggregates and normalizes documents via OpenAI.
 5. Results are deduplicated, categorized, and rendered in the dashboard.
 

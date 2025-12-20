@@ -8,7 +8,6 @@ from pydantic import ValidationError
 from config.settings import settings
 from src.tools.google_search_tool import GoogleSearchTool
 from src.tools.reddit_tool import RedditTool
-from src.tools.twitter_tool import TwitterTool
 
 
 def _json_schema(model_cls):
@@ -23,13 +22,12 @@ def test_tool_factory_methods() -> None:
     """Ensure each tool can be instantiated from settings."""
 
     assert isinstance(RedditTool.from_settings(settings), RedditTool)
-    assert isinstance(TwitterTool.from_settings(settings), TwitterTool)
     assert isinstance(GoogleSearchTool.from_settings(settings), GoogleSearchTool)
 
 
 @pytest.mark.parametrize(
     "tool_class",
-    [TwitterTool, GoogleSearchTool],
+    [GoogleSearchTool],
 )
 def test_tool_run_not_implemented(tool_class) -> None:
     """Placeholder ensuring run methods raise not implemented until defined."""
@@ -107,7 +105,7 @@ def test_tool_arg_schemas_are_defined_and_strict() -> None:
     with pytest.raises(ValidationError):
         reddit_tool.run({"query": "q", "unknown": "noop"})
 
-    for tool_class in (TwitterTool, GoogleSearchTool):
+    for tool_class in (GoogleSearchTool,):
         tool = tool_class.from_settings(settings)
         schema = _json_schema(tool.args_schema)
         props = schema["properties"]

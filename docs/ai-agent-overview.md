@@ -70,7 +70,7 @@ Return structured report
 - **Tools/Integrations:**
   - Bing Web Search API (or SerpAPI, ContextAPI) for real-time web
   - Requests, BeautifulSoup/Scrapy for custom scraping
-  - YouTube, News, Twitter, LinkedIn APIs (optional)
+  - YouTube, News, LinkedIn APIs (optional)
   - Google Custom Search (free/paid)
 - **Vector DB (optional for storing/skimming docs):** Pinecone, Chroma
 - **Interface:** Streamlit (web dashboard), FastAPI (for API), or CLI with Rich

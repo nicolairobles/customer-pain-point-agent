@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, Iterable, List
+from typing import Any, Dict, Iterable, List, Mapping, Sequence
 
 try:
     from langchain_core.callbacks.base import BaseCallbackHandler  # type: ignore
@@ -86,7 +86,6 @@ def _iter_tools(settings: Settings) -> Iterable[Any]:
     """
 
     from src.tools.reddit_tool import RedditTool
-    from src.tools.twitter_tool import TwitterTool
     from src.tools.google_search_tool import GoogleSearchTool
 
     tool_settings = getattr(settings, "tools", None)
@@ -98,9 +97,6 @@ def _iter_tools(settings: Settings) -> Iterable[Any]:
 
     if is_enabled("reddit_enabled"):
         yield RedditTool.from_settings(settings)
-
-    if is_enabled("twitter_enabled"):
-        yield TwitterTool.from_settings(settings)
 
     if is_enabled("google_search_enabled"):
         yield GoogleSearchTool.from_settings(settings)
@@ -197,6 +193,8 @@ CRITICAL:
             {"input": analysis.refined_query}, 
             config={"recursion_limit": self._recursion_limit}
         )
+
+        raw_items = _collect_tool_items(research_result) if isinstance(research_result, Mapping) else []
         
         # Robustly extract research output & stats
         # Case A: Legacy AgentExecutor (returns 'output' and 'intermediate_steps')
@@ -252,6 +250,10 @@ CRITICAL:
                         tool_outputs.append(f"Tool {m.name} returned: {m.content}")
                 if tool_outputs:
                    raw_findings = "\n\n".join(tool_outputs) + "\n\n" + str(raw_findings)
+
+        pain_points: List[Dict[str, Any]] = []
+        if raw_items and self._settings.api.openai_api_key:
+            pain_points = _extract_structured_pain_points(raw_items)
         
         # 5. Invoke Analyst Agent
         analyst_input = raw_findings if raw_findings and len(str(raw_findings)) > 10 else "NO RESEARCH FINDINGS FOUND."
@@ -259,11 +261,14 @@ CRITICAL:
         
         # 6. Construct Final Result
         metadata = research_result.get("metadata", {})
-        metadata["total_sources_searched"] = metadata.get("total_sources_searched", 0) + total_sources
+        counted_sources = max(total_sources, len(raw_items))
+        metadata["total_sources_searched"] = metadata.get("total_sources_searched", 0) + counted_sources
         
         final_result = {
             "input": input_query,
+            "query": input_query,
             "output": final_answer,
+            "pain_points": pain_points,
             "metadata": metadata,
         }
         
@@ -390,3 +395,80 @@ def _summarize_input(input_str: Any) -> str:
         preview = input_str[:80].replace("\n", " ")
         return f"str(len={len(input_str)} preview='{preview}')"
     return f"type={type(input_str).__name__}"
+
+
+def _collect_tool_items(result: Mapping[str, Any]) -> List[Mapping[str, Any]]:
+    """Extract raw tool outputs from common LangChain/LangGraph result shapes."""
+
+    collected: List[Mapping[str, Any]] = []
+
+    steps = result.get("intermediate_steps", [])
+    if isinstance(steps, list):
+        for entry in steps:
+            if not isinstance(entry, (list, tuple)) or len(entry) != 2:
+                continue
+            _action, observation = entry
+            if isinstance(observation, list):
+                for item in observation:
+                    if isinstance(item, Mapping):
+                        collected.append(item)
+
+    messages = result.get("messages", [])
+    if isinstance(messages, list):
+        for message in messages:
+            msg_type = getattr(message, "type", None)
+            if msg_type != "tool":
+                continue
+            artifact = getattr(message, "artifact", None)
+            if isinstance(artifact, list):
+                for item in artifact:
+                    if isinstance(item, Mapping):
+                        collected.append(item)
+
+    return collected
+
+
+def _extract_structured_pain_points(items: Sequence[Mapping[str, Any]]) -> List[Dict[str, Any]]:
+    """Convert tool results into extractor documents and return JSON-serializable pain points."""
+
+    from src.extractors.pain_point_extractor import extract_pain_points
+
+    documents = [_coerce_item_to_document(item) for item in items]
+    documents = [doc for doc in documents if doc is not None]
+    if not documents:
+        return []
+
+    points = extract_pain_points(documents)
+    rendered: List[Dict[str, Any]] = []
+    for point in points:
+        if hasattr(point, "model_dump"):
+            rendered.append(point.model_dump())  # type: ignore[attr-defined]
+        else:
+            rendered.append(point.dict())  # type: ignore[attr-defined]
+    return rendered
+
+
+def _coerce_item_to_document(item: Mapping[str, Any]) -> Dict[str, Any] | None:
+    """Map a normalized tool payload into the extractor's expected document schema."""
+
+    url = str(item.get("url") or item.get("permalink") or "").strip()
+    if not url:
+        return None
+
+    platform = str(item.get("platform") or "unknown").strip() or "unknown"
+    author = str(item.get("author") or "").strip()
+    timestamp = str(item.get("created_at") or item.get("timestamp") or "").strip()
+
+    title = str(item.get("title") or "").strip()
+    text = str(item.get("text") or item.get("content") or "").strip()
+
+    combined = "\n\n".join([part for part in (title, text) if part])
+
+    return {
+        "platform": platform,
+        "author": author,
+        "timestamp": timestamp,
+        "url": url,
+        "summary": title,
+        "content": combined,
+    }

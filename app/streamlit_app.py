@@ -56,7 +56,7 @@ def main() -> None:
             return
 
         try:
-            with st.spinner("Gathering insights from Reddit, Twitter, and Google..."):
+            with st.spinner("Gathering insights from Reddit and Google..."):
                 logging.info(f"Agent query started: {query[:100]}")
                 results = run_agent(query)
                 logging.info(f"Agent query completed. Tools used: {results.get('metadata', {}).get('tools_used', [])}")

@@ -9,11 +9,6 @@
 2. Create a new script application and record the client ID and client secret.
 3. Populate `REDDIT_CLIENT_ID` and `REDDIT_CLIENT_SECRET` in the `.env` file.
 
-## Twitter
-1. Apply for a developer account at [developer.twitter.com](https://developer.twitter.com/).
-2. Create a project/app and generate API credentials.
-3. Populate `TWITTER_API_KEY` and `TWITTER_API_SECRET` in the `.env` file.
-
 ## Google Custom Search
 1. Create an API key via the [Google Cloud Console](https://console.cloud.google.com/).
 2. Configure a Custom Search Engine and capture its ID.

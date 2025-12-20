@@ -294,14 +294,14 @@ def test_run_agent_merges_telemetry_tools(monkeypatch: pytest.MonkeyPatch) -> No
             return {"metadata": {"tools_used": ["metadata_tool"]}}
 
         def get_used_tools(self) -> list[str]:
-            return ["reddit", "Twitter", "reddit"]
+            return ["reddit", "Google_Search", "reddit"]
 
     monkeypatch.setattr(pain_point_agent, "create_agent", lambda: ToolAwareExecutor())
 
     result = pain_point_agent.run_agent("tool merge")
 
     tools = result["metadata"]["tools_used"]
-    assert set(tools) == {"reddit", "twitter", "metadata_tool"}
+    assert set(tools) == {"reddit", "google_search", "metadata_tool"}
 
 
 def test_stream_agent_yields_events(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -392,25 +392,21 @@ def test_tool_toggles(monkeypatch: pytest.MonkeyPatch) -> None:
     class DummyRedditTool(BaseDummyTool):
         name = "reddit"
 
-    class DummyTwitterTool(BaseDummyTool):
-        name = "twitter"
-
     class DummyGoogleSearchTool(BaseDummyTool):
         name = "google"
 
     monkeypatch.setitem(sys.modules, "src.tools.reddit_tool", types.SimpleNamespace(RedditTool=DummyRedditTool))
-    monkeypatch.setitem(sys.modules, "src.tools.twitter_tool", types.SimpleNamespace(TwitterTool=DummyTwitterTool))
     monkeypatch.setitem(
         sys.modules, "src.tools.google_search_tool", types.SimpleNamespace(GoogleSearchTool=DummyGoogleSearchTool)
     )
 
-    settings = Settings(tools=ToolSettings(reddit_enabled=False, twitter_enabled=True, google_search_enabled=True))
+    settings = Settings(tools=ToolSettings(reddit_enabled=False, google_search_enabled=True))
     tools = list(orchestrator._load_tools(settings))
     instrumented = orchestrator._attach_telemetry(tools, orchestrator._TelemetryCallbackHandler())
 
     names = [t.name for t in instrumented]
     assert "reddit" not in names
-    assert names == ["twitter", "google"]
+    assert names == ["google"]
 
     assert all(any(cb.__class__.__name__ == "_TelemetryCallbackHandler" for cb in t.callbacks) for t in instrumented)
 
@@ -431,12 +427,11 @@ def test_tool_registry_all_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
         def from_settings(cls, _settings):
             return cls()
 
-    dummy_module = types.SimpleNamespace(RedditTool=BaseDummyTool, TwitterTool=BaseDummyTool, GoogleSearchTool=BaseDummyTool)
+    dummy_module = types.SimpleNamespace(RedditTool=BaseDummyTool, GoogleSearchTool=BaseDummyTool)
     monkeypatch.setitem(sys.modules, "src.tools.reddit_tool", dummy_module)
-    monkeypatch.setitem(sys.modules, "src.tools.twitter_tool", dummy_module)
     monkeypatch.setitem(sys.modules, "src.tools.google_search_tool", dummy_module)
 
-    settings = Settings(tools=ToolSettings(reddit_enabled=False, twitter_enabled=False, google_search_enabled=False))
+    settings = Settings(tools=ToolSettings(reddit_enabled=False, google_search_enabled=False))
     tools = list(orchestrator._load_tools(settings))
 
     assert tools == []
