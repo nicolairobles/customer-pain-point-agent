@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-This week saw significant progress on the agent orchestration layer, with two major features merged (1.3.4 and 1.3.5), Google Search tool implementation completed, and important bug fixes. The project is approximately **60-70% complete**, with core agent functionality working but still missing Twitter and Google Search tool implementations.
+This week saw significant progress on the agent orchestration layer, with two major features merged (1.3.4 and 1.3.5), and important bug fixes. The project is approximately **60-70% complete**, with core agent functionality working but still missing Google Search tool implementation.
 
 ---
 
@@ -80,8 +80,7 @@ This week saw significant progress on the agent orchestration layer, with two ma
    - ✅ Tool registration system
 
 2. **Phase 2: Multi-Source Integration** - ~40% Complete
-   - ✅ Google Search tool (implementation complete, needs integration testing)
-   - ❌ Twitter/X API integration (stub only)
+   - ⚠️ Google Search tool (stub only)
    - ⚠️ Multi-tool agent orchestration (partially working - only Reddit active)
    - ❌ Enhanced UI with filters and export
 
@@ -99,10 +98,9 @@ This week saw significant progress on the agent orchestration layer, with two ma
 
 ### ⚠️ Current Blockers & Issues
 
-1. **Twitter Tool Not Implemented**
-   - `src/tools/twitter_tool.py` contains only stub code
-   - `NotImplementedError` raised when called
-   - **Impact**: Agent cannot search Twitter, limiting to Reddit only
+1. **Source scope update**
+   - Twitter/X removed from scope due to API limits
+   - **Impact**: Agent focuses on Reddit + Google Search
 
 2. **Google Search Tool Not Integrated**
    - Implementation complete but not registered/active in agent
@@ -125,18 +123,7 @@ This week saw significant progress on the agent orchestration layer, with two ma
 
 ### Critical Path Items (Must Complete)
 
-#### 1. **Complete Twitter Tool Implementation** (Priority: HIGH)
-- **Stories**: 2.1.1 - 2.1.4 (Design, Search, Parsing, Tests)
-- **Estimated Effort**: 8-12 hours
-- **Tasks**:
-  - Design Twitter API wrapper interface
-  - Implement Twitter search functionality
-  - Implement Twitter data parsing
-  - Write unit tests for Twitter tool
-- **Owner**: TBD
-- **Dependencies**: Twitter API credentials
-
-#### 2. **Integrate Google Search Tool with Agent** (Priority: HIGH)
+#### 1. **Integrate Google Search Tool with Agent** (Priority: HIGH)
 - **Story**: 2.3.1 (Register new tools with agent)
 - **Estimated Effort**: 2-4 hours
 - **Tasks**:
@@ -146,15 +133,15 @@ This week saw significant progress on the agent orchestration layer, with two ma
 - **Owner**: TBD
 - **Dependencies**: Google Search tool implementation (✅ done)
 
-#### 3. **Multi-Source Aggregation** (Priority: HIGH)
+#### 2. **Multi-Source Aggregation** (Priority: HIGH)
 - **Story**: 2.3.2 (Implement cross-source aggregation)
 - **Estimated Effort**: 4-6 hours
 - **Tasks**:
-  - Aggregate results from Reddit, Twitter, Google
+  - Aggregate results from Reddit and Google
   - Deduplicate findings across sources
   - Normalize data formats
 - **Owner**: TBD
-- **Dependencies**: All 3 tools must be implemented and registered
+- **Dependencies**: Tools must be implemented and registered
 
 #### 4. **End-to-End Integration Testing** (Priority: MEDIUM)
 - **Story**: 1.5.1 (End-to-end testing)
@@ -231,7 +218,6 @@ This week saw significant progress on the agent orchestration layer, with two ma
 ### Estimated Time to Completion
 
 **Minimum Viable Product (MVP)**: 20-30 hours
-- Twitter tool implementation: 8-12 hours
 - Google Search integration: 2-4 hours
 - Multi-source aggregation: 4-6 hours
 - Basic integration testing: 4-6 hours
@@ -246,7 +232,7 @@ This week saw significant progress on the agent orchestration layer, with two ma
 
 ### Recommended Timeline
 
-- **Week 1 (Dec 5-12)**: Complete Twitter tool + Google integration
+- **Week 1 (Dec 5-12)**: Complete Google integration
 - **Week 2 (Dec 12-19)**: Multi-source aggregation + integration testing
 - **Week 3 (Dec 19-26)**: UI enhancements + deployment
 - **Week 4 (Dec 26-Jan 2)**: Polish, documentation, demo video
@@ -255,10 +241,10 @@ This week saw significant progress on the agent orchestration layer, with two ma
 
 ## 🚨 Risks & Concerns
 
-1. **Twitter API Access**
-   - May require paid tier or have rate limits
+1. **Google Search API Access**
+   - Quotas and rate limits may affect throughput
    - Need to verify API credentials and access level
-   - **Mitigation**: Check API status early, consider alternatives if needed
+   - **Mitigation**: Validate credentials early and add caching where possible
 
 2. **Integration Complexity**
    - Multi-source aggregation may reveal edge cases
@@ -277,11 +263,10 @@ This week saw significant progress on the agent orchestration layer, with two ma
 
 ## 📝 Action Items for This Week
 
-1. **Assign ownership** for Twitter tool implementation
-2. **Verify API credentials** for Twitter and Google Search
-3. **Integrate Google Search tool** with agent orchestrator
-4. **Plan integration testing** approach and test cases
-5. **Review current branch** (`feature/1.3.5-implement-agent-query-processing`) for merge readiness
+1. **Verify API credentials** for Google Search
+2. **Integrate Google Search tool** with agent orchestrator
+3. **Plan integration testing** approach and test cases
+4. **Review current branch** (`feature/1.3.5-implement-agent-query-processing`) for merge readiness
 
 ---
 
@@ -307,9 +292,8 @@ This week saw significant progress on the agent orchestration layer, with two ma
 ## Next Steps
 
 1. **Immediate**: Review this update and assign tasks
-2. **This Week**: Start Twitter tool implementation
-3. **This Week**: Integrate Google Search tool
-4. **Next Week**: Begin multi-source aggregation work
+2. **This Week**: Integrate Google Search tool
+3. **Next Week**: Begin multi-source aggregation work
 
 ---
 

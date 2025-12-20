@@ -2,14 +2,14 @@
 
 ## Project Setup Instructions
 
-I'm building a **Customer Pain Point Discovery Agent** - an AI-powered tool that discovers customer pain points from multiple online sources (Reddit, Twitter, Google Search) and presents structured findings through a Streamlit dashboard.
+I'm building a **Customer Pain Point Discovery Agent** - an AI-powered tool that discovers customer pain points from multiple online sources (Reddit, Google Search) and presents structured findings through a Streamlit dashboard.
 
 ### Technology Stack
 - **Primary Framework**: LangChain (for agent orchestration)
 - **LLM**: OpenAI GPT (for pain point extraction and categorization)
 - **UI**: Streamlit
 - **Language**: Python 3.11.x
-- **APIs**: Reddit API, Twitter API, Google Search API
+- **APIs**: Reddit API, Google Search API
 - **Deployment**: Streamlit Cloud
 
 ### Project Structure
@@ -34,7 +34,6 @@ customer-pain-point-agent/
 │   ├── tools/
 │   │   ├── __init__.py
 │   │   ├── reddit_tool.py
-│   │   ├── twitter_tool.py
 │   │   └── google_search_tool.py
 │   ├── extractors/
 │   │   ├── __init__.py
@@ -65,7 +64,7 @@ customer-pain-point-agent/
 
 **Functional Requirements:**
 1. Accept natural language queries (1-50 words) about customer pain points
-2. Search 3 data sources: Reddit, Twitter, Google Search (5-10 results each)
+2. Search data sources: Reddit, Google Search (5-10 results each)
 3. Extract and categorize pain points using LLM with structured JSON output
 4. Each pain point should include: name, description, frequency, example quote, source citation
 5. Display results in intuitive Streamlit dashboard with source URLs and timestamps
@@ -87,7 +86,6 @@ customer-pain-point-agent/
 - openai
 - streamlit
 - praw (Reddit)
-- tweepy (Twitter)
 - google-api-python-client
 - python-dotenv
 - pytest
@@ -97,8 +95,6 @@ customer-pain-point-agent/
 - OPENAI_API_KEY
 - REDDIT_CLIENT_ID
 - REDDIT_CLIENT_SECRET
-- TWITTER_API_KEY
-- TWITTER_API_SECRET
 - GOOGLE_SEARCH_API_KEY
 - GOOGLE_SEARCH_ENGINE_ID
 
@@ -110,10 +106,10 @@ customer-pain-point-agent/
 **src/agent/pain_point_agent.py** should:
 - Implement main LangChain agent
 - Use ReAct or Plan-and-Execute agent pattern
-- Coordinate multiple tools (Reddit, Twitter, Google)
+- Coordinate multiple tools (Reddit, Google)
 - Return structured JSON with pain points
 
-**src/tools/** (reddit_tool.py, twitter_tool.py, google_search_tool.py) should:
+**src/tools/** (reddit_tool.py, google_search_tool.py) should:
 - Implement LangChain Tool interface
 - Handle API authentication
 - Return 5-10 relevant results per query
@@ -162,7 +158,7 @@ customer-pain-point-agent/
       "examples": ["quote1", "quote2"],
       "sources": [
         {
-          "platform": "reddit|twitter|google",
+          "platform": "reddit|google_search",
           "url": "string",
           "timestamp": "ISO8601",
           "author": "string"

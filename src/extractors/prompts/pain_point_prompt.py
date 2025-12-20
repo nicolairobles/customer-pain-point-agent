@@ -13,7 +13,7 @@ from textwrap import indent
 from typing import Iterable, List, Mapping, Sequence
 
 # Prompt versioning helps with auditability. Increment when intent/schema change.
-PAIN_POINT_PROMPT_VERSION = "1.0.0"
+PAIN_POINT_PROMPT_VERSION = "1.1.0"
 
 
 def format_documents_for_prompt(documents: Iterable[Mapping[str, str]]) -> str:
@@ -64,7 +64,7 @@ class PainPointPrompt:
       "examples": ["string"],
       "sources": [
         {
-          "platform": "reddit|twitter|google",
+          "platform": "reddit|google_search",
           "url": "string",
           "timestamp": "ISO-8601 string",
           "author": "string"
@@ -76,7 +76,6 @@ class PainPointPrompt:
     "common_themes": ["string"],
     "data_coverage": {
       "reddit_posts_considered": 0,
-      "twitter_posts_considered": 0,
       "google_results_considered": 0
     },
     "confidence": "high|medium|low",
@@ -118,4 +117,3 @@ If the data contains sensitive or harmful content, flag it explicitly rather tha
 # RESPONSE SCHEMA (version {PAIN_POINT_PROMPT_VERSION})
 {self.response_schema}
 """
-

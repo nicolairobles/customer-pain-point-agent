@@ -9,17 +9,17 @@ PROJECT TITLE: Customer Pain Point Discovery Agent
 
 PROJECT PURPOSE/JUSTIFICATION:
 Build an AI agent that automatically discovers customer pain points from multiple online sources 
-(Reddit, Twitter, web search) to demonstrate modern AI/ML skills for job applications.
+(Reddit, web search) to demonstrate modern AI/ML skills for job applications.
 
 PROJECT DESCRIPTION:
 An intelligent agent using LangChain and OpenAI that:
 - Accepts user query (e.g., "What pain points do B2B product managers face?")
-- Searches multiple data sources (Reddit, Twitter, Google)
+- Searches multiple data sources (Reddit, Google)
 - Extracts and categorizes pain points using LLM
 - Presents structured findings in Streamlit dashboard
 
 HIGH-LEVEL REQUIREMENTS:
-1. Agent must search at least 3 data sources
+1. Agent must search at least 2 data sources
 2. Output must be structured (JSON/table format)
 3. Must include source citations
 4. Response time < 2 minutes
@@ -34,21 +34,20 @@ SUCCESS CRITERIA:
 - Live URL shareable in resumes/LinkedIn
 
 HIGH-LEVEL RISKS:
-- API rate limits (Reddit, Twitter, OpenAI)
+- API rate limits (Reddit, Google Search, OpenAI)
 - Team members getting jobs mid-project
 - API costs exceeding budget ($50 limit)
 - Complexity of multi-tool agent orchestration
 
 SUMMARY MILESTONE SCHEDULE:
 - Phase 1 - Reddit integration + basic agent
-- Phase 2 - Add Twitter + Google Search
+- Phase 2 - Add Google Search
 - Phase 3 - UI polish + error handling
 - Phase 4 - Deployment + documentation
 
 SUMMARY BUDGET:
 - OpenAI API: $10-15
 - Reddit API: Free
-- Twitter API: $0-5 (basic tier)
 - Google Search API: $0 (100 queries/day free)
 - Streamlit Cloud: Free
 - Total: $10-20
@@ -79,10 +78,9 @@ Priority: Must Have
 Stakeholder: Al (Product Owner), Users
 
 FR-2: Multi-Source Data Collection
-Description: Agent must search at least 3 data sources
+Description: Agent must search at least 2 data sources
 Acceptance Criteria:
 - Reddit API integration working
-- Twitter API integration working
 - Google Search API integration working
 - Each source returns 5-10 relevant results
 Priority: Must Have
@@ -102,7 +100,7 @@ FR-4: Source Citation
 Description: Every pain point must cite source(s)
 Acceptance Criteria:
 - Each pain point shows source URL
-- Source includes: platform (Reddit/Twitter), timestamp, author
+- Source includes: platform (Reddit/Google Search), timestamp, author
 - User can click to view original post
 Priority: Should Have
 Stakeholder: Amanda (QA)
@@ -169,7 +167,7 @@ Acceptance Criteria:
 
 Milestone ID: M2
 Milestone Name: Phase 2 Complete - Multi-Source Agent
-Description: Agent searches 3 sources (Reddit, Twitter, Google)
+Description: Agent searches 2 sources (Reddit, Google)
 Acceptance Criteria:
 - All 3 tools integrated
 - Agent orchestrates multiple sources
@@ -211,7 +209,6 @@ Criteria: 50% of work packages marked complete
 Milestone ID: M6
 Milestone Name: First Public Demo
 Type: Optional (Marketing)
-Description: Share demo link on LinkedIn/Twitter
+Description: Share demo link on LinkedIn
 Criteria: Agent functional enough for external viewing
 ```
-

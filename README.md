@@ -1,10 +1,10 @@
 # Customer Pain Point Discovery Agent
 
-An AI-powered agent that aggregates customer pain points from Reddit, Twitter, and Google Search, extracts structured insights, and presents them in a Streamlit dashboard.
+An AI-powered agent that aggregates customer pain points from Reddit and Google Search, extracts structured insights, and presents them in a Streamlit dashboard.
 
 ## Features
 - Natural language query interface (1-50 words)
-- Multi-source search across Reddit, Twitter, and Google Search
+- Multi-source search across Reddit and Google Search
 - LLM-powered pain point extraction with structured JSON output
 - Streamlit dashboard for interactive exploration
 - Modular architecture for adding new data sources
@@ -13,7 +13,7 @@ An AI-powered agent that aggregates customer pain points from Reddit, Twitter, a
 
 ### Prerequisites
 - Python 3.11.x (project pinned to `langchain==0.0.340`; macOS users can bootstrap Miniforge and create `conda create -n cppagent-py311 python=3.11`)
-- Access credentials for Reddit, Twitter, Google Search APIs, and OpenAI
+- Access credentials for Reddit, Google Search APIs, and OpenAI
 
 ### Installation
 ```bash

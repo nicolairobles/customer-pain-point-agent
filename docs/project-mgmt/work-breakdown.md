@@ -15,7 +15,7 @@ DELIVERABLES
 └── 1.4 Basic Streamlit UI
 
 2.0 PHASE 2: MULTI-SOURCE INTEGRATION
-├── 2.1 Twitter/X API Integration
+├── 2.1 Optional Third-Source Integration (TBD)
 ├── 2.2 Google Search API Integration
 ├── 2.3 Multi-Tool Agent Orchestration
 └── 2.4 Enhanced UI (filters, export)
@@ -302,52 +302,16 @@ Story Link:
 [Detailed Story](https://github.com/nicolairobles/customer-pain-point-agent/blob/master/docs/stories/1.5.3-push-to-github.md)
 
 ```
-Activity ID: 2.1.1
-Activity: Design Twitter API wrapper interface
-Description: Define signatures, configuration, and schema for Twitter integration
-Work Package: 3.1.1 Twitter Wrapper Design
+Activity ID: 2.1.x
+Activity: Decide third source or rescope
+Description: Twitter/X removed from scope due to API constraints; decide whether to replace it or rescope to 2 sources.
+Work Package: 3.1.x Product Decision
 Duration: 1 hour
-Story Points: 3
-Owner: Stefan
+Story Points: 1
+Owner: Al
 Story Link:
 ```
-[Detailed Story](https://github.com/nicolairobles/customer-pain-point-agent/blob/master/docs/stories/2.1.1-design-twitter-api-wrapper-interface.md)
-
-```
-Activity ID: 2.1.2
-Activity: Implement Twitter search functionality
-Description: Build Twitter tool that queries tweets with filters and logging
-Work Package: 3.1.2 Twitter Search Implementation
-Duration: 4 hours
-Story Points: 5
-Owner: Edison
-Story Link:
-```
-[Detailed Story](https://github.com/nicolairobles/customer-pain-point-agent/blob/master/docs/stories/2.1.2-implement-twitter-search-functionality.md)
-
-```
-Activity ID: 2.1.3
-Activity: Implement Twitter data parsing
-Description: Normalize tweet payloads into shared schema
-Work Package: 3.1.3 Twitter Data Parsing
-Duration: 3 hours
-Story Points: 3
-Owner: Javier
-Story Link:
-```
-[Detailed Story](https://github.com/nicolairobles/customer-pain-point-agent/blob/master/docs/stories/2.1.3-implement-twitter-data-parsing.md)
-
-```
-Activity ID: 2.1.4
-Activity: Write unit tests for Twitter tool
-Description: Cover success, failure, and normalization cases for Twitter integration
-Work Package: 3.1.4 Twitter Tool Testing
-Duration: 2 hours
-Story Points: 2
-Owner: Amanda
-Story Link:
-```
-[Detailed Story](https://github.com/nicolairobles/customer-pain-point-agent/blob/master/docs/stories/2.1.4-write-unit-tests-for-twitter-tool.md)
+[Project Issue](../../issues/generated/2.1.5_decide-third-source-or-rescope-requirements.md)
 
 ```
 Activity ID: 2.2.1
@@ -400,7 +364,7 @@ Story Link:
 ```
 Activity ID: 2.3.1
 Activity: Register new tools with agent
-Description: Add Twitter and Google tools to agent configuration with guards
+Description: Add Google tool to agent configuration with guards
 Work Package: 3.3.1 Agent Tool Registration
 Duration: 2 hours
 Story Points: 3
@@ -494,5 +458,4 @@ Owner: TBD
 Issue Link:
 ```
 [Generated Issue](https://github.com/nicolairobles/customer-pain-point-agent/blob/master/issues/generated/5.1.2_implement-dependency-update-automation.md)
-
 

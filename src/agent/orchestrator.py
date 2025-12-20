@@ -76,7 +76,6 @@ def _iter_tools(settings: Settings) -> Iterable[Any]:
     """
 
     from src.tools.reddit_tool import RedditTool
-    from src.tools.twitter_tool import TwitterTool
     from src.tools.google_search_tool import GoogleSearchTool
 
     tool_settings = getattr(settings, "tools", None)
@@ -88,9 +87,6 @@ def _iter_tools(settings: Settings) -> Iterable[Any]:
 
     if is_enabled("reddit_enabled"):
         yield RedditTool.from_settings(settings)
-
-    if is_enabled("twitter_enabled"):
-        yield TwitterTool.from_settings(settings)
 
     if is_enabled("google_search_enabled"):
         yield GoogleSearchTool.from_settings(settings)

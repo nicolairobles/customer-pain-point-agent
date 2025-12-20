@@ -1,13 +1,13 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-- Core code lives in `src/`: `agent/` (LangChain orchestration), `tools/` (Reddit, Twitter, Google Search integrations), `extractors/` (OpenAI JSON parsing), and `utils/` (validation/formatting). Configuration defaults sit in `config/settings.py`.
+- Core code lives in `src/`: `agent/` (LangChain orchestration), `tools/` (Reddit, Google Search integrations), `extractors/` (OpenAI JSON parsing), and `utils/` (validation/formatting). Configuration defaults sit in `config/settings.py`.
 - UI is a Streamlit app at `app/streamlit_app.py`; docs and architecture notes live in `docs/`. Example outputs and ad-hoc scripts sit in `examples/` and `scripts/`.
 - Tests follow `tests/test_*.py`. Keep fixtures and sample payloads close to the feature under test.
 
 ## Build, Test, and Development Commands
 - Create a local env and install deps (Python 3.11): `python -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt`.
-- Seed configuration: `cp .env.example .env` then fill API keys (OpenAI, Reddit, Twitter, Google Search).
+- Seed configuration: `cp .env.example .env` then fill API keys (OpenAI, Reddit, Google Search).
 - Run the dashboard: `streamlit run app/streamlit_app.py`.
 - Quick tool smoke tests: `python scripts/run_reddit_tool_debug.py --query "your topic"` and `python scripts/test_google_search.py` (requires Google keys).
 - Full test suite: `pytest`; add `-k` to target modules while iterating.

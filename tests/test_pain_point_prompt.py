@@ -62,8 +62,8 @@ def test_sample_outputs_validate_against_schema() -> None:
                   "author": "redditorA"
                 },
                 {
-                  "platform": "twitter",
-                  "url": "https://twitter.com/example/status/1",
+                  "platform": "google_search",
+                  "url": "https://example.com/discussion/1",
                   "timestamp": "2025-11-16T13:20:00Z",
                   "author": "customer_success_lead"
                 }
@@ -79,7 +79,7 @@ def test_sample_outputs_validate_against_schema() -> None:
               ],
               "sources": [
                 {
-                  "platform": "google",
+                  "platform": "google_search",
                   "url": "https://example.com/review/123",
                   "timestamp": "2025-11-14T18:30:00Z",
                   "author": "b2b_reviewer_23"
@@ -93,7 +93,6 @@ def test_sample_outputs_validate_against_schema() -> None:
             ],
             "data_coverage": {
               "reddit_posts_considered": 3,
-              "twitter_posts_considered": 2,
               "google_results_considered": 1
             },
             "confidence": "medium",
@@ -118,5 +117,4 @@ def test_schema_regression_guard() -> None:
     expected_hash_anchor = "pain_points"
 
     assert prompt.response_schema.count(expected_hash_anchor) >= 1
-
 
