@@ -1,0 +1,19 @@
+{
+  "items": [
+    {
+      "title": "Test Result 1",
+      "snippet": "This is a test snippet",
+      "link": "https://example.com/1",
+      "displayLink": "example.com",
+      "pagemap": {
+        "metatags": [{"article:published_time": "2023-01-01"}]
+      }
+    },
+    {
+      "title": "Test Result 2",
+      "snippet": "Another test snippet",
+      "link": "https://example.com/2",
+      "displayLink": "example.com"
+    }
+  ]
+}

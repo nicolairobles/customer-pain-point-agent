@@ -25,18 +25,6 @@ def test_tool_factory_methods() -> None:
     assert isinstance(GoogleSearchTool.from_settings(settings), GoogleSearchTool)
 
 
-@pytest.mark.parametrize(
-    "tool_class",
-    [GoogleSearchTool],
-)
-def test_tool_run_not_implemented(tool_class) -> None:
-    """Placeholder ensuring run methods raise not implemented until defined."""
-
-    tool = tool_class.from_settings(settings)
-    with pytest.raises(NotImplementedError):
-        tool.run({"query": "sample query"})
-
-
 def test_reddit_tool_run_returns_results(monkeypatch):
     # Basic smoke: RedditTool.run should execute the implemented _run path.
     # Patch PRAW to avoid network calls or OAuth exceptions.
@@ -88,6 +76,44 @@ def test_reddit_tool_run_returns_results(monkeypatch):
     assert "nsfw" in payload["content_flags"]
 
 
+def test_google_search_tool_run_returns_results() -> None:
+    """Basic smoke: GoogleSearchTool.run should call the client with expected params."""
+    from unittest.mock import MagicMock, patch
+
+    from config.settings import APISettings, Settings, ToolSettings
+
+    mock_client = MagicMock()
+    mock_cse = MagicMock()
+    mock_list = MagicMock()
+    mock_execute = MagicMock()
+
+    mock_execute.return_value = {"items": []}
+    mock_list.return_value.execute = mock_execute
+    mock_cse.return_value.list = mock_list
+    mock_client.cse = mock_cse
+
+    test_settings = Settings(
+        api=APISettings(
+            google_search_api_key="dummy_api_key",
+            google_search_engine_id="dummy_engine_id",
+        ),
+        tools=ToolSettings(reddit_enabled=False, google_search_enabled=True),
+    )
+
+    tool = GoogleSearchTool.from_settings(test_settings)
+
+    with patch("src.tools.google_search_tool.build", return_value=mock_client):
+        results = tool.run({"query": "test query", "num": 5, "lang": "en", "site": "example.com"})
+
+    assert results == []
+    call_kwargs = mock_list.call_args[1]
+    assert call_kwargs["q"] == "test query"
+    assert call_kwargs["cx"] == "dummy_engine_id"
+    assert call_kwargs["num"] == 5
+    assert call_kwargs["lr"] == "lang_en"
+    assert call_kwargs["siteSearch"] == "example.com"
+
+
 def test_tool_arg_schemas_are_defined_and_strict() -> None:
     reddit_tool = RedditTool.from_settings(settings)
     reddit_schema = _json_schema(reddit_tool.args_schema)
@@ -112,7 +138,7 @@ def test_tool_arg_schemas_are_defined_and_strict() -> None:
 
         assert tool.description
         assert schema["required"] == ["query"]
-        assert list(props.keys()) == ["query"]
+        assert set(props.keys()) == {"query", "num", "lang", "site"}
         assert props["query"]["type"] == "string"
         with pytest.raises(ValidationError):
             tool.run({"query": "q", "unexpected": True})
