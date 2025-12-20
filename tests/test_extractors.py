@@ -15,7 +15,6 @@ def test_deduplicate_pain_points_returns_list() -> None:
 
 
 def test_extract_pain_points_not_implemented() -> None:
-    """Placeholder ensuring extraction raises until implemented."""
+    """Empty document sets should return an empty list."""
 
-    with pytest.raises(NotImplementedError):
-        pain_point_extractor.extract_pain_points([])
+    assert pain_point_extractor.extract_pain_points([]) == []
