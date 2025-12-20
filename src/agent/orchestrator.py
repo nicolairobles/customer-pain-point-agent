@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, Iterable, List
+from typing import Any, Dict, Iterable, List, Mapping, Sequence
 
 from config.settings import Settings
 
@@ -148,9 +148,29 @@ class _AgentRunner:
         self._agent = agent_graph
         self._recursion_limit = max(1, settings.agent.max_iterations)
         self._telemetry_handler = telemetry_handler
+        self._settings = settings
 
     def invoke(self, payload: Dict[str, Any]) -> Any:
-        return self._agent.invoke(payload, config={"recursion_limit": self._recursion_limit})
+        result = self._agent.invoke(payload, config={"recursion_limit": self._recursion_limit})
+        if not isinstance(result, Mapping):
+            return result
+
+        raw_items = _collect_tool_items(result)
+        if not raw_items or not self._settings.api.openai_api_key:
+            return result
+
+        pain_points = _extract_structured_pain_points(raw_items)
+        if not pain_points:
+            return result
+
+        enriched: Dict[str, Any] = dict(result)
+        enriched["pain_points"] = pain_points
+        metadata = enriched.get("metadata")
+        if not isinstance(metadata, dict):
+            metadata = {}
+        metadata["total_sources_searched"] = int(metadata.get("total_sources_searched", 0)) + len(raw_items)
+        enriched["metadata"] = metadata
+        return enriched
 
     def stream(self, payload: Dict[str, Any]):
         yield from self._agent.stream(payload, config={"recursion_limit": self._recursion_limit})
@@ -212,3 +232,80 @@ def _summarize_input(input_str: Any) -> str:
         preview = input_str[:80].replace("\n", " ")
         return f"str(len={len(input_str)} preview='{preview}')"
     return f"type={type(input_str).__name__}"
+
+
+def _collect_tool_items(result: Mapping[str, Any]) -> List[Mapping[str, Any]]:
+    """Extract raw tool outputs from common LangChain/LangGraph result shapes."""
+
+    collected: List[Mapping[str, Any]] = []
+
+    steps = result.get("intermediate_steps", [])
+    if isinstance(steps, list):
+        for entry in steps:
+            if not isinstance(entry, (list, tuple)) or len(entry) != 2:
+                continue
+            _action, observation = entry
+            if isinstance(observation, list):
+                for item in observation:
+                    if isinstance(item, Mapping):
+                        collected.append(item)
+
+    messages = result.get("messages", [])
+    if isinstance(messages, list):
+        for message in messages:
+            msg_type = getattr(message, "type", None)
+            if msg_type != "tool":
+                continue
+            artifact = getattr(message, "artifact", None)
+            if isinstance(artifact, list):
+                for item in artifact:
+                    if isinstance(item, Mapping):
+                        collected.append(item)
+
+    return collected
+
+
+def _extract_structured_pain_points(items: Sequence[Mapping[str, Any]]) -> List[Dict[str, Any]]:
+    """Convert tool results into extractor documents and return JSON-serializable pain points."""
+
+    from src.extractors.pain_point_extractor import extract_pain_points
+
+    documents = [_coerce_item_to_document(item) for item in items]
+    documents = [doc for doc in documents if doc is not None]
+    if not documents:
+        return []
+
+    points = extract_pain_points(documents)
+    rendered: List[Dict[str, Any]] = []
+    for point in points:
+        if hasattr(point, "model_dump"):
+            rendered.append(point.model_dump())  # type: ignore[attr-defined]
+        else:
+            rendered.append(point.dict())  # type: ignore[attr-defined]
+    return rendered
+
+
+def _coerce_item_to_document(item: Mapping[str, Any]) -> Dict[str, Any] | None:
+    """Map a normalized tool payload into the extractor's expected document schema."""
+
+    url = str(item.get("url") or item.get("permalink") or "").strip()
+    if not url:
+        return None
+
+    platform = str(item.get("platform") or "unknown").strip() or "unknown"
+    author = str(item.get("author") or "").strip()
+    timestamp = str(item.get("created_at") or item.get("timestamp") or "").strip()
+
+    title = str(item.get("title") or "").strip()
+    text = str(item.get("text") or item.get("content") or "").strip()
+
+    combined = "\n\n".join([part for part in (title, text) if part])
+
+    return {
+        "platform": platform,
+        "author": author,
+        "timestamp": timestamp,
+        "url": url,
+        "summary": title,
+        "content": combined,
+    }
