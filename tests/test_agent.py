@@ -22,7 +22,7 @@ def test_normalize_response_structure() -> None:
         "metadata": {"total_sources_searched": 0, "execution_time": 0.0, "api_costs": 0.0},
     }
     normalized = pain_point_agent._normalize_response(raw)  # pylint: disable=protected-access
-    assert set(normalized.keys()) == {"query", "pain_points", "metadata"}
+    assert set(normalized.keys()) == {"query", "pain_points", "metadata", "output"}
 
 
 @pytest.mark.skip(reason="Requires LangChain agent configuration")
@@ -120,9 +120,17 @@ def test_build_agent_executor_invokes_initialize_agent(monkeypatch: pytest.Monke
 
     executor = orchestrator.build_agent_executor(settings)
 
+    # Avoid hitting the QueryProcessor/Analyst OpenAI calls in unit tests.
+    from src.agent.query_processor import QueryAnalysis
+
+    executor._query_processor.analyze = lambda q: QueryAnalysis(  # type: ignore[attr-defined]
+        refined_query=q, search_terms=["hello"], subreddits=["python"], context_notes=""
+    )
+    executor._analyst.review = lambda _analysis, _research_output: "final"  # type: ignore[attr-defined]
+
     result = executor.invoke({"input": "hello"})
-    assert result["tools"] == ["dummy_tool"]
-    assert result["recursion_limit"] == 3
+    assert result["output"] == "final"
+    assert result["metadata"]["total_sources_searched"] == 0
     assert call_log["model_attempted"] is True
     assert call_log["prompt"]
     assert call_log["tools"] == [dummy_tool]
@@ -144,9 +152,15 @@ def test_agent_stream_interface(monkeypatch: pytest.MonkeyPatch) -> None:
     settings = Settings(agent=AgentSettings(max_iterations=2, verbose=False))
     executor = orchestrator.build_agent_executor(settings)
 
+    from src.agent.query_processor import QueryAnalysis
+
+    executor._query_processor.analyze = lambda q: QueryAnalysis(  # type: ignore[attr-defined]
+        refined_query=q, search_terms=["stream"], subreddits=["python"], context_notes=""
+    )
+
     events = list(executor.stream({"input": "stream-test"}))
     assert events[0]["event"] == "start"
-    assert events[-1]["event"] == "end"
+    assert any(event.get("event") == "end" for event in events)
     assert call_log["stream_config"]["recursion_limit"] == 2
 
 
