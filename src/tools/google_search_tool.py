@@ -148,6 +148,12 @@ class GoogleSearchTool(BaseTool):
                     "GoogleSearchTool: returning %d results in %.2f seconds for query: %s",
                     len(normalized_results), duration, query
                 )
+                if normalized_results:
+                    _LOG.info("GoogleSearchTool top results:")
+                    for idx, item in enumerate(normalized_results[:5], start=1):
+                        title = str(item.get("title", ""))[:90]
+                        display = str(item.get("display_url", ""))[:60]
+                        _LOG.info("  %d. [%s] %s", idx, display or "unknown", title)
                 
                 return normalized_results
                 
