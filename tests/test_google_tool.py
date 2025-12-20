@@ -261,3 +261,35 @@ def test_google_search_tool_failure_injection(test_settings: Settings) -> None:
 
             # With broken normalization returning None, results should be filtered out
             assert len(results) == 0
+
+
+def test_google_search_tool_accepts_customsearch_result_kind(test_settings: Settings) -> None:
+    """Regression: real API items use kind=customsearch#result (should not be filtered out)."""
+    from unittest.mock import MagicMock, patch
+
+    mock_client = MagicMock()
+    mock_cse = MagicMock()
+    mock_list = MagicMock()
+    mock_execute = MagicMock()
+
+    mock_execute.return_value = {
+        "items": [
+            {
+                "kind": "customsearch#result",
+                "title": "Example",
+                "snippet": "Snippet",
+                "link": "https://example.com",
+                "displayLink": "example.com",
+            }
+        ]
+    }
+    mock_list.return_value.execute = mock_execute
+    mock_cse.return_value.list = mock_list
+    mock_client.cse = mock_cse
+
+    with patch("src.tools.google_search_tool.build", return_value=mock_client):
+        tool = GoogleSearchTool.from_settings(test_settings)
+        results = tool._run("test query", num=1)
+
+    assert len(results) == 1
+    assert results[0]["platform"] == "google_search"

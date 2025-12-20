@@ -152,10 +152,12 @@ def normalize_google_result(item: Dict[str, Any], position: int) -> Optional[Dic
     Extracts core fields, sanitizes text, normalizes dates, and tags with platform
     information for consistent downstream processing.
     """
-    # Skip non-web results (images, videos, etc.) - focus on web pages
-    kind = item.get("kind", "")
-    if kind and not kind.endswith("#searchResult"):
-        LOGGER.debug("Skipping non-web result: %s", kind)
+    kind = str(item.get("kind", "") or "")
+    # Google Custom Search typically uses `customsearch#result` for web results.
+    # Some wrappers/fixtures may use other suffixes; only skip when we're confident
+    # it's a non-web result.
+    if kind and not (kind.endswith("#result") or kind.endswith("#searchResult")):
+        LOGGER.debug("Skipping non-web result kind=%s", kind)
         return None  # Filtered out by caller
 
     return {
