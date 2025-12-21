@@ -10,7 +10,7 @@ from urllib.parse import urlparse
 
 import streamlit as st
 
-from src.utils.formatters import format_currency, format_duration, truncate_description
+from src.utils.formatters import format_duration, truncate_description
 
 _RESULTS_STYLE = """
 <style>
@@ -110,12 +110,10 @@ def build_metadata_summary(metadata: Dict[str, Any]) -> List[MetadataStat]:
 
     total_sources = metadata.get("total_sources_searched") or metadata.get("total_sources") or 0
     executions = metadata.get("execution_time") or metadata.get("execution_time_seconds") or 0.0
-    cost = metadata.get("api_costs") or metadata.get("cost_usd") or 0.0
 
     return [
         MetadataStat("Sources Searched", f"{int(total_sources)}"),
         MetadataStat("Execution Time", format_duration(executions)),
-        MetadataStat("API Cost", format_currency(cost)),
     ]
 
 
