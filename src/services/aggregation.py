@@ -43,7 +43,7 @@ class CrossSourceAggregator:
         """Aggregate and score tool outputs.
 
         Args:
-            items: Iterable of tool results.
+            items: Sequence of tool results.
             errors: Optional list of tool error strings to track provenance failures.
         """
 
