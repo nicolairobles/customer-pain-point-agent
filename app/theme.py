@@ -190,6 +190,15 @@ def get_global_css() -> str:
     [data-testid="stToolbar"] {
         display: none;
     }
+    [data-testid="stToolbarActions"] {
+        display: none;
+    }
+    [data-testid="stDeployButton"] {
+        display: none;
+    }
+    button[title="Deploy"], button[aria-label="Deploy"] {
+        display: none !important;
+    }
     #MainMenu {
         visibility: hidden;
     }
@@ -262,6 +271,14 @@ def get_global_css() -> str:
         font-weight: 500;
     }
 
+    .pp-step-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        background: rgba(20, 16, 37, 0.18);
+        box-shadow: inset 0 0 0 1px rgba(20, 16, 37, 0.12);
+    }
+
     .pp-chips {
         display: flex;
         flex-wrap: wrap;
@@ -308,6 +325,11 @@ def get_global_css() -> str:
         border-color: rgba(127, 86, 217, 0.35);
         box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.12);
         background: linear-gradient(135deg, rgba(127, 86, 217, 0.10) 0%, rgba(34, 211, 238, 0.10) 100%);
+    }
+
+    .pp-step--active .pp-step-dot {
+        background: var(--color-accent);
+        box-shadow: 0 0 0 3px rgba(127, 86, 217, 0.12);
     }
 
     .pp-step--done {
@@ -409,22 +431,8 @@ def get_global_css() -> str:
     }
 
     .pp-activity-row {
-        display: grid;
-        grid-template-columns: 22px 1fr;
-        gap: 10px;
+        display: block;
         padding: 6px 0;
-        align-items: center;
-    }
-
-    .pp-activity-icon {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 22px;
-        height: 22px;
-        border-radius: 8px;
-        background: rgba(34, 211, 238, 0.10);
-        border: 1px solid rgba(34, 211, 238, 0.18);
     }
 
     .pp-activity-text {

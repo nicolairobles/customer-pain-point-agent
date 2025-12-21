@@ -127,8 +127,10 @@ class ResearchProgressPanel:
         for step in self._steps:
             state = self._status_by_key.get(step.key, "pending")
             pills.append(
-                f"<div class='pp-step pp-step--{state}'><span class='pp-step-icon'>{_safe_text(step.icon)}</span>"
-                f"<span class='pp-step-label'>{_safe_text(step.label)}</span></div>"
+                "<div class='pp-step pp-step--{state}'>"
+                "<span class='pp-step-dot'></span>"
+                "<span class='pp-step-label'>{label}</span>"
+                "</div>".format(state=_safe_text(state), label=_safe_text(step.label))
             )
 
         tool_chips: list[str] = []
@@ -141,12 +143,10 @@ class ResearchProgressPanel:
                 badge = f"<span class='pp-chip-count'>{tool_state.count}</span>"
             tool_chips.append(
                 "<div class='pp-chip pp-chip--{status}'>"
-                "<span class='pp-chip-icon'>{icon}</span>"
                 "<span class='pp-chip-label'>{label}</span>"
                 "{badge}"
                 "</div>".format(
                     status=_safe_text(tool_state.status),
-                    icon=_safe_text(tool_state.icon),
                     label=_safe_text(tool_state.label),
                     badge=badge,
                 )
@@ -194,7 +194,6 @@ class ResearchProgressPanel:
             for entry in self._activity[-self._max_activity :]:
                 entries.append(
                     "<div class='pp-activity-row'>"
-                    f"<span class='pp-activity-icon'>{_safe_text(entry.get('icon',''))}</span>"
                     f"<span class='pp-activity-text'>{_safe_text(entry.get('text',''))}</span>"
                     "</div>"
                 )
@@ -202,25 +201,23 @@ class ResearchProgressPanel:
                 "<div class='pp-activity'><div class='pp-activity-title'>Activity</div>" + "".join(entries) + "</div>"
             )
 
-        self._slot.markdown(
-            f"""
-            <div class="pp-panel">
-              <div class="pp-panel-inner">
-                <div class="pp-progress-header">
-                  <div class="pp-progress-title">Research Progress</div>
-                  <div class="pp-progress-eta">Estimated: 30–90s</div>
-                </div>
-                <div class="pp-progress-status">{_safe_text(self._active_message)}</div>
-                <div class='pp-steps'>{''.join(pills)}</div>
-                <div class='pp-chips'>{''.join(tool_chips)}</div>
-                {source_html}
-                {recent_html}
-                {activity_html}
-              </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
+        # IMPORTANT: avoid leading indentation; Markdown treats indented blocks as code.
+        panel_html = (
+            "<div class=\"pp-panel\">"
+            "<div class=\"pp-panel-inner\">"
+            "<div class=\"pp-progress-header\">"
+            "<div class=\"pp-progress-title\">Research Progress</div>"
+            "<div class=\"pp-progress-eta\">Estimated: 30–90s</div>"
+            "</div>"
+            f"<div class=\"pp-progress-status\">{_safe_text(self._active_message)}</div>"
+            f"<div class='pp-steps'>{''.join(pills)}</div>"
+            f"<div class='pp-chips'>{''.join(tool_chips)}</div>"
+            f"{source_html}"
+            f"{recent_html}"
+            f"{activity_html}"
+            "</div></div>"
         )
+        self._slot.markdown(panel_html, unsafe_allow_html=True)
 
     def apply_event(self, event: Mapping[str, Any]) -> None:
         """Update the panel based on a progress event emitted by the agent backend."""
@@ -237,7 +234,7 @@ class ResearchProgressPanel:
         if event_type == "retry":
             attempt = event.get("attempt")
             self._active_message = f"Retrying (attempt {attempt})…"
-            self._push_activity("↻", f"Retrying (attempt {attempt})")
+            self._push_activity(f"Retrying (attempt {attempt})")
             self.render()
             return
 
@@ -255,7 +252,7 @@ class ResearchProgressPanel:
                 if bucket and bucket in self._tool_states:
                     self._tool_states[bucket].status = "running"
                     self._tool_states[bucket].last_updated = _now()
-                self._push_activity("🔎", f"Searching {pretty}")
+                self._push_activity(f"Searching {pretty}")
                 self.render()
                 return
 
@@ -264,7 +261,7 @@ class ResearchProgressPanel:
                 if bucket and bucket in self._tool_states:
                     self._tool_states[bucket].status = "error"
                     self._tool_states[bucket].last_updated = _now()
-                self._push_activity("⚠️", f"{pretty} error")
+                self._push_activity(f"{pretty} error")
                 self.render()
                 return
 
@@ -282,10 +279,10 @@ class ResearchProgressPanel:
 
                 if isinstance(count, int):
                     self._active_message = f"Searched {pretty} ({count} results)"
-                    self._push_activity("✅", f"Searched {pretty} ({count})")
+                    self._push_activity(f"Searched {pretty} ({count})")
                 else:
                     self._active_message = f"Searched {pretty}"
-                    self._push_activity("✅", f"Searched {pretty}")
+                    self._push_activity(f"Searched {pretty}")
                 self.render()
                 return
 
@@ -293,7 +290,7 @@ class ResearchProgressPanel:
             message = str(event.get("message") or "")
             if message:
                 self._active_message = message
-                self._push_activity("⚠️", message)
+                self._push_activity(message)
                 self.render()
 
     def _request_stage(self, stage: str, *, message: str | None) -> None:
@@ -337,16 +334,15 @@ class ResearchProgressPanel:
                 self._status_by_key[step.key] = "pending"
 
         activity_map = {
-            "planning": ("🧠", "Planning search"),
-            "research": ("🔎", "Searching sources"),
-            "dedupe": ("🧬", "Deduplicating & scoring"),
-            "extract": ("🧾", "Extracting pain points"),
-            "synthesize": ("✨", "Writing report"),
-            "complete": ("🏁", "Complete"),
+            "planning": "Planning search",
+            "research": "Searching sources",
+            "dedupe": "Deduplicating & scoring",
+            "extract": "Extracting pain points",
+            "synthesize": "Writing report",
+            "complete": "Complete",
         }
         if stage in activity_map:
-            icon, text = activity_map[stage]
-            self._push_activity(icon, text)
+            self._push_activity(activity_map[stage])
 
         self.render()
 
@@ -379,12 +375,12 @@ class ResearchProgressPanel:
             top = self._recent_sources[0]
             self._current_source = {"domain": str(top.get("domain", "")), "title": str(top.get("title", ""))}
 
-    def _push_activity(self, icon: str, text: str) -> None:
+    def _push_activity(self, text: str) -> None:
         cleaned = text.strip()
         if not cleaned:
             return
         if self._activity and self._activity[-1].get("text") == cleaned:
             return
-        self._activity.append({"icon": icon, "text": cleaned})
+        self._activity.append({"text": cleaned})
         if len(self._activity) > (self._max_activity * 3):
             self._activity = self._activity[-(self._max_activity * 3) :]
