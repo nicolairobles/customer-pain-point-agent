@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, Iterable, List, Mapping, Sequence
+from typing import Any, Callable, Dict, Iterable, List, Mapping, Sequence
 
 try:
     from langchain_core.callbacks.base import BaseCallbackHandler  # type: ignore
@@ -19,7 +19,7 @@ from src.services.aggregation import CrossSourceAggregator
 logger = logging.getLogger(__name__)
 
 
-def build_agent_executor(settings: Settings) -> Any:
+def build_agent_executor(settings: Settings, *, progress_callback: Callable[[Dict[str, Any]], None] | None = None) -> Any:
     """Construct an Agent executor configured with project tools and prompts.
 
     LangChain imports are deferred until this function is called so that the
@@ -63,7 +63,7 @@ def build_agent_executor(settings: Settings) -> Any:
 
     tools = _load_tools(settings)
     llm = _build_llm(settings)
-    telemetry_handler = _TelemetryCallbackHandler()
+    telemetry_handler = _TelemetryCallbackHandler(progress_callback=progress_callback)
 
     # We now return an _AgentRunner that orchestrates the QueryProcessor -> Agent flow
     # Pass 'tools' and 'llm' so the runner can rebuild the agent per request with dynamic prompts.
@@ -72,7 +72,8 @@ def build_agent_executor(settings: Settings) -> Any:
         settings=settings,
         telemetry_handler=telemetry_handler,
         tools=tools,
-        llm=llm
+        llm=llm,
+        progress_callback=progress_callback,
     )
 
 
@@ -139,12 +140,14 @@ class _AgentRunner:
         telemetry_handler: Any | None = None,
         tools: List[Any] | None = None,
         llm: Any | None = None,
+        progress_callback: Callable[[Dict[str, Any]], None] | None = None,
     ) -> None:
         self._recursion_limit = max(1, settings.agent.max_iterations)
         self._telemetry_handler = telemetry_handler
         self._settings = settings
         self._tools = tools or []
         self._llm = llm
+        self._progress_callback = progress_callback
         
         from src.agent.query_processor import QueryProcessor
         from src.agent.analyst import Analyst
@@ -155,6 +158,8 @@ class _AgentRunner:
     def invoke(self, payload: Dict[str, Any]) -> Any:
         # 1. Analyze Query
         input_query = payload.get("input", "")
+        if self._progress_callback is not None:
+            self._progress_callback({"type": "stage", "stage": "planning", "message": "Planning search…"})
         analysis = self._query_processor.analyze(input_query)
         
         # 2. Build Dynamic System Prompt for RESEARCHER
@@ -196,6 +201,8 @@ CRITICAL:
             research_agent = create_react_agent(llm=self._llm, tools=instrumented_tools, prompt=system_prompt)
 
         # 4. Invoke Research Agent
+        if self._progress_callback is not None:
+            self._progress_callback({"type": "stage", "stage": "research", "message": "Searching sources…"})
         research_result = research_agent.invoke(
             {"input": analysis.refined_query}, 
             config={"recursion_limit": self._recursion_limit}
@@ -210,6 +217,8 @@ CRITICAL:
         aggregation_result = None
         aggregated_items: List[Mapping[str, Any]] = raw_items
         try:
+            if self._progress_callback is not None:
+                self._progress_callback({"type": "stage", "stage": "dedupe", "message": "Deduplicating & scoring…"})
             aggregation_result = self._aggregator.aggregate(
                 aggregated_items,
                 errors=list(getattr(self._telemetry_handler, "tool_errors", []) or []),
@@ -222,6 +231,14 @@ CRITICAL:
                 str(exc),
                 exc_info=True
             )
+            if self._progress_callback is not None:
+                self._progress_callback(
+                    {
+                        "type": "warning",
+                        "stage": "dedupe",
+                        "message": "Aggregation failed; continuing with raw tool items.",
+                    }
+                )
             aggregation_result = None
         
         # Robustly extract research output & stats
@@ -281,10 +298,14 @@ CRITICAL:
 
         pain_points: List[Dict[str, Any]] = []
         if aggregated_items and self._settings.api.openai_api_key:
+            if self._progress_callback is not None:
+                self._progress_callback({"type": "stage", "stage": "extract", "message": "Extracting pain points…"})
             pain_points = _extract_structured_pain_points(aggregated_items)
         
         # 5. Invoke Analyst Agent
         analyst_input = raw_findings if raw_findings and len(str(raw_findings)) > 10 else "NO RESEARCH FINDINGS FOUND."
+        if self._progress_callback is not None:
+            self._progress_callback({"type": "stage", "stage": "synthesize", "message": "Writing report…"})
         final_answer = self._analyst.review(analysis, analyst_input)
         
         # 6. Construct Final Result
@@ -315,6 +336,9 @@ CRITICAL:
             "pain_points": pain_points,
             "metadata": metadata,
         }
+
+        if self._progress_callback is not None:
+            self._progress_callback({"type": "stage", "stage": "complete", "message": "Done."})
         
         return final_result
 
@@ -411,10 +435,11 @@ class _TelemetryCallbackHandler(BaseCallbackHandler):
     ignore_agent = False
     raise_error = False
 
-    def __init__(self) -> None:
+    def __init__(self, *, progress_callback: Callable[[Dict[str, Any]], None] | None = None) -> None:
         import logging
 
         self._log = logging.getLogger(__name__)
+        self._progress_callback = progress_callback
         self.used_tools: set[str] = set()
         self.tool_output_counts: dict[str, int] = {}
         self.tool_errors: list[str] = []
@@ -425,6 +450,8 @@ class _TelemetryCallbackHandler(BaseCallbackHandler):
         self._log.info("tool_start name=%s input=%s", tool_name, summary)
         if tool_name and tool_name != "<unknown>":
             self.used_tools.add(str(tool_name))
+        if self._progress_callback is not None:
+            self._progress_callback({"type": "tool_start", "tool": str(tool_name), "input_summary": summary})
 
     def on_tool_end(self, output: Any, **kwargs: Any) -> None:
         count: int | None = None
@@ -440,12 +467,23 @@ class _TelemetryCallbackHandler(BaseCallbackHandler):
             self.tool_output_counts[tool_name] = count
 
         self._log.info("tool_end name=%s output_type=%s count=%s", tool_name, type(output).__name__, count)
+        if self._progress_callback is not None:
+            self._progress_callback(
+                {
+                    "type": "tool_end",
+                    "tool": tool_name,
+                    "count": count,
+                    "sources": _summarize_tool_sources(output),
+                }
+            )
 
     def on_tool_error(self, error: BaseException, **kwargs: Any) -> None:  # type: ignore[override]
         tool_name = str(kwargs.get("name") or kwargs.get("tool") or "<unknown>")
         message = f"tool_error name={tool_name} error={type(error).__name__}: {error}"
         self.tool_errors.append(message)
         self._log.warning(message)
+        if self._progress_callback is not None:
+            self._progress_callback({"type": "tool_error", "tool": tool_name, "message": str(error)})
 
 
 def _summarize_input(input_str: Any) -> str:
@@ -460,6 +498,36 @@ def _summarize_input(input_str: Any) -> str:
         return f"str(len={len(input_str)} preview='{preview}')"
     return f"type={type(input_str).__name__}"
 
+
+def _summarize_tool_sources(output: Any, *, limit: int = 6) -> List[Dict[str, str]]:
+    """Extract a small set of source hints (domain/title) from tool output for UI progress panels."""
+
+    if not output:
+        return []
+
+    items: list[Any] = []
+    if isinstance(output, list):
+        items = output
+    elif isinstance(output, dict) and isinstance(output.get("results"), list):
+        items = list(output.get("results") or [])
+
+    summarized: List[Dict[str, str]] = []
+    for raw in items:
+        if not isinstance(raw, Mapping):
+            continue
+        url = raw.get("url") or raw.get("link") or raw.get("permalink")
+        if not isinstance(url, str) or not url.strip():
+            continue
+        title = raw.get("title") or raw.get("name") or raw.get("summary")
+        summarized.append(
+            {
+                "url": url.strip(),
+                "title": str(title).strip() if title is not None else "",
+            }
+        )
+        if len(summarized) >= limit:
+            break
+    return summarized
 
 def _collect_tool_items(result: Mapping[str, Any]) -> List[Mapping[str, Any]]:
     """Extract raw tool outputs from common LangChain/LangGraph result shapes."""

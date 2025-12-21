@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import logging
 import os
+import time
+from concurrent.futures import ThreadPoolExecutor
+from queue import Empty, Queue
 import streamlit as st
 
 # Ensure repo root is on sys.path so `from src...` imports work when
@@ -16,6 +19,7 @@ if str(REPO_ROOT) not in sys.path:
 
 from src.utils.validators import ValidationError, validate_query_length
 from app.components.query_input import render_query_presets, render_query_text_area
+from app.components.research_progress import ResearchProgressPanel
 from app.components.results_display import render_results
 from app.theme import apply_global_styles
 from config.settings import settings
@@ -63,11 +67,40 @@ def main() -> None:
             )
             return
 
+        progress_events: "Queue[dict]" = Queue()
+
+        def on_progress(event: dict) -> None:
+            progress_events.put(event)
+
+        progress_panel = ResearchProgressPanel()
+
         try:
-            with st.spinner("Gathering insights from Reddit and Google..."):
-                logging.info(f"Agent query started: {query[:100]}")
-                results = run_agent(query)
-                logging.info(f"Agent query completed. Tools used: {results.get('metadata', {}).get('tools_used', [])}")
+            logging.info("Agent query started: %s", query[:100])
+            with ThreadPoolExecutor(max_workers=1) as pool:
+                future = pool.submit(run_agent, query, progress_callback=on_progress)
+
+                while not future.done():
+                    try:
+                        event = progress_events.get(timeout=0.15)
+                        if isinstance(event, dict):
+                            progress_panel.apply_event(event)
+                    except Empty:
+                        # Re-rendering without new events risks "fake" progress; keep the last real status.
+                        pass
+                    progress_panel.tick()
+                    time.sleep(0.05)
+
+                results = future.result()
+                # Flush any remaining progress events, then force a final completion render.
+                while True:
+                    try:
+                        event = progress_events.get_nowait()
+                    except Empty:
+                        break
+                    if isinstance(event, dict):
+                        progress_panel.apply_event(event)
+                progress_panel.apply_event({"type": "stage", "stage": "complete", "message": "Done."})
+                logging.info("Agent query completed. Tools used: %s", results.get("metadata", {}).get("tools_used", []))
         except ImportError as exc:
             logging.error(f"Import error: {exc}")
             st.error(

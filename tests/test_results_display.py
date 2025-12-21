@@ -13,9 +13,10 @@ def test_build_metadata_summary_formats_values() -> None:
         {"total_sources_searched": 7, "execution_time": 1.2345, "api_costs": 0.00456}
     )
 
-    assert [stat.label for stat in stats] == ["Sources Searched", "Execution Time"]
+    assert [stat.label for stat in stats] == ["Sources Searched", "Execution Time", "API Cost"]
     assert stats[0].value == "7"
     assert stats[1].value == "1.23s"
+    assert stats[2].value == "$0.005"
 
 
 def test_build_metadata_summary_handles_missing_fields() -> None:
@@ -23,6 +24,11 @@ def test_build_metadata_summary_handles_missing_fields() -> None:
 
     stats = results_display.build_metadata_summary({})
     assert [stat.value for stat in stats] == ["0", "0.00s"]
+
+
+def test_build_metadata_summary_hides_zero_cost() -> None:
+    stats = results_display.build_metadata_summary({"total_sources_searched": 1, "execution_time": 0.5, "api_costs": 0})
+    assert [stat.label for stat in stats] == ["Sources Searched", "Execution Time"]
 
 
 def test_normalize_pain_points_populates_defaults() -> None:
