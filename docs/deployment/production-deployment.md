@@ -6,7 +6,7 @@ This guide documents how to ship the Streamlit application to production, monito
 
 - **Dockerfile** (repo root) builds a slim Python 3.11 image, installs pinned dependencies, and runs the Streamlit app on port `8501` with a built-in health check.
 - **GitHub Actions workflow**: `.github/workflows/deploy.yml` builds the image, runs the test suite, and publishes to GitHub Container Registry (`ghcr.io`).
-  - Triggers on `main` updates (app/config changes) and via **workflow_dispatch** for manual deploys.
+  - Triggers on `master` updates (app/config changes) and via **workflow_dispatch** for manual deploys.
   - Uses `actions/setup-python@v5` to ensure the Python 3.11 toolchain matches production.
   - Tags images with the commit SHA by default; override via the `image_tag` input when dispatching the workflow.
 
@@ -17,13 +17,16 @@ Set these as environment secrets in your hosting platform (or GitHub Actions env
 | Variable | Purpose | Required |
 | --- | --- | --- |
 | `OPENAI_API_KEY` | LLM requests | Yes |
-| `REDDIT_CLIENT_ID` / `REDDIT_CLIENT_SECRET` | Reddit API credentials | Yes |
+| `REDDIT_CLIENT_ID` / `REDDIT_CLIENT_SECRET` | Reddit API credentials | Yes (when `TOOL_REDDIT_ENABLED=true`) |
 | `REDDIT_USER_AGENT` | Identifies client to Reddit | Recommended |
-| `GOOGLE_SEARCH_API_KEY` / `GOOGLE_SEARCH_ENGINE_ID` | Google Custom Search | Yes |
+| `GOOGLE_SEARCH_API_KEY` / `GOOGLE_SEARCH_ENGINE_ID` | Google Custom Search | Yes (when `TOOL_GOOGLE_SEARCH_ENABLED=true`) |
 | `TWITTER_BEARER_TOKEN` | Reserved for future Twitter ingestion | Optional |
 | `STREAMLIT_SERVER_PORT` | Overrides default port | Optional |
 
-In production, the healthcheck script treats `GOOGLE_SEARCH_API_KEY` and `GOOGLE_SEARCH_ENGINE_ID` as required secrets; if you intentionally run without search, either provide placeholder values or use `--allow-missing-secrets` for non-production checks.
+The container healthcheck validates secrets based on enabled tools:
+- If `TOOL_REDDIT_ENABLED=true` (default), it requires Reddit credentials.
+- If `TOOL_GOOGLE_SEARCH_ENABLED=true` (default), it requires Google credentials.
+Disable a tool explicitly (set the env var to `false`) if you deploy without that provider.
 
 For GitHub Actions publishing, `GITHUB_TOKEN` (provided by GitHub) authenticates to GHCR. Deploy-time secrets should be injected by the runtime (Kubernetes/VM host/Streamlit Community Cloud) rather than stored in the image.
 

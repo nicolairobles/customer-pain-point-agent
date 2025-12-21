@@ -9,13 +9,6 @@ import urllib.error
 import urllib.request
 from typing import Sequence
 
-REQUIRED_KEYS: tuple[str, ...] = (
-    "OPENAI_API_KEY",
-    "REDDIT_CLIENT_ID",
-    "REDDIT_CLIENT_SECRET",
-    "GOOGLE_SEARCH_API_KEY",
-    "GOOGLE_SEARCH_ENGINE_ID",
-)
 DEFAULT_URL = "http://localhost:8501/"
 
 
@@ -31,19 +24,33 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(list(argv) if argv is not None else None)
 
 
+def _env_flag(key: str, *, default: str = "false") -> bool:
+    value = os.getenv(key, default).strip().lower()
+    return value in {"1", "true", "yes", "on"}
+
+
 def get_missing_required_keys(allow_missing_secrets: bool) -> list[str]:
     """Return list of required environment variable keys that are not set.
-    
+
     Args:
         allow_missing_secrets: If True, returns empty list regardless of missing keys.
                              If False, returns list of required keys not found in environment.
-    
+
     Returns:
         List of missing required key names, or empty list if allow_missing_secrets is True.
     """
     if allow_missing_secrets:
         return []
-    return [key for key in REQUIRED_KEYS if not os.getenv(key)]
+
+    required_keys: list[str] = ["OPENAI_API_KEY"]
+
+    if _env_flag("TOOL_REDDIT_ENABLED", default="true"):
+        required_keys.extend(["REDDIT_CLIENT_ID", "REDDIT_CLIENT_SECRET"])
+
+    if _env_flag("TOOL_GOOGLE_SEARCH_ENABLED", default="true"):
+        required_keys.extend(["GOOGLE_SEARCH_API_KEY", "GOOGLE_SEARCH_ENGINE_ID"])
+
+    return [key for key in required_keys if not os.getenv(key)]
 
 
 def probe_url(url: str, timeout: float) -> int:

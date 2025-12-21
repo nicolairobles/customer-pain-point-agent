@@ -97,6 +97,47 @@ class TestGetMissingRequiredKeys:
             missing = get_missing_required_keys(allow_missing_secrets=True)
             assert missing == []
 
+    def test_disabling_google_tool_skips_google_credentials(self):
+        with mock.patch.dict(
+            os.environ,
+            {
+                "OPENAI_API_KEY": "test-key",
+                "REDDIT_CLIENT_ID": "test-id",
+                "REDDIT_CLIENT_SECRET": "test-secret",
+                "TOOL_GOOGLE_SEARCH_ENABLED": "false",
+            },
+            clear=True,
+        ):
+            missing = get_missing_required_keys(allow_missing_secrets=False)
+            assert missing == []
+
+    def test_disabling_reddit_tool_skips_reddit_credentials(self):
+        with mock.patch.dict(
+            os.environ,
+            {
+                "OPENAI_API_KEY": "test-key",
+                "GOOGLE_SEARCH_API_KEY": "test-google-key",
+                "GOOGLE_SEARCH_ENGINE_ID": "test-engine-id",
+                "TOOL_REDDIT_ENABLED": "false",
+            },
+            clear=True,
+        ):
+            missing = get_missing_required_keys(allow_missing_secrets=False)
+            assert missing == []
+
+    def test_disabling_all_tools_requires_openai_only(self):
+        with mock.patch.dict(
+            os.environ,
+            {
+                "OPENAI_API_KEY": "test-key",
+                "TOOL_REDDIT_ENABLED": "false",
+                "TOOL_GOOGLE_SEARCH_ENABLED": "false",
+            },
+            clear=True,
+        ):
+            missing = get_missing_required_keys(allow_missing_secrets=False)
+            assert missing == []
+
 
 class TestProbeUrl:
     """Tests for URL probing."""
