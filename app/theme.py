@@ -74,6 +74,9 @@ def get_global_css() -> str:
         padding-top: 0;
         padding-bottom: 0;
     }
+    [data-testid="stMainBlockContainer"] {
+        padding: 0 1.5rem 1.5rem;
+    }
 
     [data-testid="stHeader"] {
         background: transparent;
