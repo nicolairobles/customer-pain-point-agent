@@ -63,6 +63,14 @@ class ToolSettings:
 
 
 @dataclass(frozen=True)
+class UISettings:
+    """Configuration for UI behavior and production gating."""
+
+    production_mode: bool = os.getenv("UI_PRODUCTION_MODE", "true").lower() == "true"
+    debug_panel_enabled: bool = os.getenv("SHOW_DEBUG_PANEL", "false").strip().lower() in {"1", "true", "yes", "on"}
+
+
+@dataclass(frozen=True)
 class Settings:
     """Aggregated application settings exposed to the rest of the codebase."""
 
@@ -71,6 +79,7 @@ class Settings:
     budget: BudgetSettings = BudgetSettings()
     llm: LLMSettings = LLMSettings()
     tools: ToolSettings = ToolSettings()
+    ui: UISettings = UISettings()
 
 
 settings = Settings()
@@ -84,4 +93,5 @@ def to_dict() -> Dict[str, Any]:
         "agent": settings.agent.__dict__,
         "budget": settings.budget.__dict__,
         "llm": settings.llm.__dict__,
+        "ui": settings.ui.__dict__,
     }

@@ -64,12 +64,11 @@ def render_query_input() -> str:
     """Render the query input component and return the cleaned text."""
 
     with st.container():
-        st.selectbox(
+        selection = st.selectbox(
             label="Example queries",
             options=[EXAMPLE_PLACEHOLDER, *EXAMPLE_PROMPTS],
             index=0,
             key=EXAMPLE_SELECT_KEY,
-            on_change=_apply_example_selection,
             help="Use a preset if you need a quick starting point.",
         )
 
@@ -80,6 +79,12 @@ def render_query_input() -> str:
             placeholder="Example: Customers say the reporting dashboard feels slow and confusing on mobile.",
             label_visibility="collapsed",
         )
+
+        if selection and selection != EXAMPLE_PLACEHOLDER:
+            if not raw_query.strip():
+                st.session_state[QUERY_INPUT_KEY] = selection
+                raw_query = selection
+            st.session_state[EXAMPLE_SELECT_KEY] = EXAMPLE_PLACEHOLDER
 
         clean_query = normalize_query(raw_query)
         word_count = count_words(clean_query)
