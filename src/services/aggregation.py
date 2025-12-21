@@ -160,6 +160,11 @@ class CrossSourceAggregator:
         aggregate_score = base_weight * (
             (self.recency_weight * recency_score) + (self.engagement_weight * engagement_score)
         )
+        # Confidence calculation combines base confidence, multi-source validation, and recency:
+        # - 0.35: Base confidence for any item (establishes minimum confidence floor)
+        # - 0.25 * source_count: Each additional source adds validation (up to +0.25 for multi-source)
+        # - 0.4 * recency_score: Recent items get confidence boost (up to +0.4 for very recent)
+        # This ensures confidence grows with cross-source validation and recency, capped at 1.0
         confidence = min(
             1.0,
             0.35 + 0.25 * len(item.get("sources", [])) + 0.4 * recency_score,
@@ -210,6 +215,11 @@ class CrossSourceAggregator:
                     existing_title_len = len(existing_title)
                     max_title_len = max(candidate_title_len, existing_title_len)
                     min_title_len = min(candidate_title_len, existing_title_len)
+                    # Title similarity uses a more lenient threshold than full text:
+                    # - Subtract 0.1 from main threshold to allow minor title variations
+                    # - Floor at 0.5 to prevent matching completely different titles
+                    # Rationale: Titles are shorter and more formulaic, so small word changes
+                    # (e.g., "Payment fails" vs "Payment failure") should still match
                     title_threshold = max(self.near_duplicate_threshold - 0.1, 0.5)
                     if max_title_len > 0 and (min_title_len / max_title_len) < title_threshold:
                         continue
@@ -248,10 +258,62 @@ class CrossSourceAggregator:
         return merged
 
     def _canonical_url(self, url: str) -> str:
+        """Canonicalize URL for deduplication purposes.
+        
+        Normalizes common URL variations to detect duplicates:
+        - Removes trailing slashes
+        - Converts to lowercase
+        - Normalizes http/https protocols to https
+        - Removes www. prefix
+        - Strips fragment identifiers (#)
+        - Sorts query parameters alphabetically
+        
+        Note: This is intentionally a simple normalization focused on common
+        variations. More sophisticated URL parsing (e.g., domain equivalence,
+        URL shortener expansion) is not performed to keep processing fast.
+        """
+        from urllib.parse import urlparse, parse_qs, urlencode
+        
         normalized = url.strip().lower()
-        if normalized.endswith("/"):
-            normalized = normalized[:-1]
-        return normalized
+        if not normalized:
+            return ""
+        
+        try:
+            parsed = urlparse(normalized)
+            
+            # Normalize scheme (http -> https)
+            scheme = "https" if parsed.scheme in ("http", "https") else parsed.scheme
+            
+            # Remove www. prefix from netloc
+            netloc = parsed.netloc
+            if netloc.startswith("www."):
+                netloc = netloc[4:]
+            
+            # Remove fragment
+            fragment = ""
+            
+            # Sort query parameters for consistent ordering
+            query = ""
+            if parsed.query:
+                params = parse_qs(parsed.query, keep_blank_values=True)
+                sorted_params = sorted(params.items())
+                query = urlencode(sorted_params, doseq=True)
+            
+            # Remove trailing slash from path
+            path = parsed.path.rstrip("/") if parsed.path else ""
+            
+            # Reconstruct URL
+            if netloc:
+                canonical = f"{scheme}://{netloc}{path}"
+                if query:
+                    canonical += f"?{query}"
+                return canonical
+            else:
+                # Fallback for malformed URLs
+                return normalized.rstrip("/")
+        except Exception:
+            # If URL parsing fails, fall back to simple normalization
+            return normalized.rstrip("/")
 
     def _parse_timestamp(self, timestamp: Any) -> datetime | None:
         if timestamp in (None, "", 0):
@@ -298,6 +360,18 @@ class CrossSourceAggregator:
         return votes + (comments * self.comment_weight)
 
     def _normalize_engagement(self, engagement_signal: float) -> float:
+        """Normalize engagement signal to [0, 1] range using exponential decay.
+        
+        The scaling factor of 10.0 controls the rate of saturation:
+        - engagement=10 → ~0.63 normalized score
+        - engagement=23 → ~0.90 normalized score
+        - engagement=46 → ~0.99 normalized score
+        
+        This logarithmic curve prevents extremely high engagement from dominating
+        scores while still rewarding popular content. Adjust the factor (10.0) to
+        control sensitivity: smaller values saturate faster, larger values allow
+        higher engagement items to differentiate more.
+        """
         if engagement_signal <= 0:
             return 0.0
         return min(1.0, 1.0 - math.exp(-engagement_signal / 10.0))

@@ -212,7 +212,15 @@ CRITICAL:
                 errors=list(getattr(self._telemetry_handler, "tool_errors", []) or []),
             )
             aggregated_items = aggregation_result.items
-        except Exception:
+        except Exception as exc:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(
+                "Cross-source aggregation failed: %s: %s. Continuing with raw tool items.",
+                type(exc).__name__,
+                str(exc),
+                exc_info=True
+            )
             aggregation_result = None
         
         # Robustly extract research output & stats
