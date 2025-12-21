@@ -155,6 +155,15 @@ def get_global_css() -> str:
         padding-left: 1.25rem;
     }
 
+    .pp-wordmark {
+        font-size: 0.9rem;
+        font-weight: 500;
+        letter-spacing: 0.28em;
+        text-transform: uppercase;
+        color: var(--color-text-secondary);
+        margin: 6px 0 6px;
+    }
+
     /* Forms: avoid extra border/padding causing "boxed" look */
     [data-testid="stForm"] {
         border: none;

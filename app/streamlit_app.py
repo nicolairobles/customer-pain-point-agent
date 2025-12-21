@@ -43,9 +43,7 @@ def main() -> None:
     """Render the Streamlit application."""
 
     apply_global_styles()
-    logo_left, logo_center, logo_right = st.columns([1, 1, 1])
-    with logo_center:
-        st.image("app/assets/logo.png", width=56)
+    st.markdown("<div class='pp-wordmark'>CPP Agent</div>", unsafe_allow_html=True)
     st.title("Customer Pain Point Discovery Agent")
 
     render_query_presets()
