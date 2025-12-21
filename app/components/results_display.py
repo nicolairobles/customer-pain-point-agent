@@ -12,7 +12,6 @@ import streamlit as st
 
 from src.utils.formatters import format_currency, format_duration, truncate_description
 
-_STYLE_SESSION_KEY = "results_component_styles_loaded"
 _RESULTS_STYLE = """
 <style>
 .pp-results-metrics {
@@ -102,12 +101,8 @@ class PainPointDisplay:
 
 
 def _inject_styles() -> None:
-    """Ensure component-specific styling is applied once per session."""
-
-    if st.session_state.get(_STYLE_SESSION_KEY):
-        return
+    """Ensure component-specific styling is applied for the current render."""
     st.markdown(_RESULTS_STYLE, unsafe_allow_html=True)
-    st.session_state[_STYLE_SESSION_KEY] = True
 
 
 def build_metadata_summary(metadata: Dict[str, Any]) -> List[MetadataStat]:

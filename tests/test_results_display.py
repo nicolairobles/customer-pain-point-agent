@@ -110,3 +110,19 @@ def test_normalize_pain_points_sanitizes_citations() -> None:
     assert normalized[0].citations[0] == "&lt;script&gt;alert\\(1\\)&lt;/script&gt;"
     assert normalized[0].citations[1] == r"[Docs](https://example.com/(test))"
 
+
+def test_inject_styles_runs_every_render(monkeypatch) -> None:
+    """Component CSS must be emitted on reruns to avoid regressions."""
+
+    calls: list[str] = []
+
+    def fake_markdown(value: str, unsafe_allow_html: bool = False) -> None:
+        assert unsafe_allow_html is True
+        calls.append(value)
+
+    monkeypatch.setattr(results_display.st, "markdown", fake_markdown)
+
+    results_display._inject_styles()
+    results_display._inject_styles()
+
+    assert len(calls) == 2
