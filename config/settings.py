@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Dict
 
 from dotenv import load_dotenv
@@ -32,6 +32,20 @@ class AgentSettings:
     cache_enabled: bool = os.getenv("CACHE_ENABLED", "true").lower() == "true"
     max_iterations: int = int(os.getenv("AGENT_MAX_ITERATIONS", "15"))
     verbose: bool = os.getenv("AGENT_VERBOSE", "false").lower() == "true"
+
+
+@dataclass(frozen=True)
+class AggregationSettings:
+    """Configuration for cross-source aggregation and scoring."""
+
+    recency_weight: float = float(os.getenv("AGGREGATION_RECENCY_WEIGHT", "0.55"))
+    engagement_weight: float = float(os.getenv("AGGREGATION_ENGAGEMENT_WEIGHT", "0.45"))
+    max_item_age_days: int = int(os.getenv("AGGREGATION_MAX_ITEM_AGE_DAYS", "365"))
+    near_duplicate_threshold: float = float(os.getenv("AGGREGATION_NEAR_DUPLICATE_THRESHOLD", "0.82"))
+    reddit_source_weight: float = float(os.getenv("AGGREGATION_REDDIT_WEIGHT", "1.0"))
+    google_source_weight: float = float(os.getenv("AGGREGATION_GOOGLE_WEIGHT", "0.9"))
+    default_source_weight: float = float(os.getenv("AGGREGATION_DEFAULT_WEIGHT", "0.75"))
+    extra_source_weights: Dict[str, float] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -76,6 +90,7 @@ class Settings:
 
     api: APISettings = APISettings()
     agent: AgentSettings = AgentSettings()
+    aggregation: AggregationSettings = AggregationSettings()
     budget: BudgetSettings = BudgetSettings()
     llm: LLMSettings = LLMSettings()
     tools: ToolSettings = ToolSettings()
@@ -91,6 +106,7 @@ def to_dict() -> Dict[str, Any]:
     return {
         "api": settings.api.__dict__,
         "agent": settings.agent.__dict__,
+        "aggregation": settings.aggregation.__dict__,
         "budget": settings.budget.__dict__,
         "llm": settings.llm.__dict__,
         "ui": settings.ui.__dict__,
