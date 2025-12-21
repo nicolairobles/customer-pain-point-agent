@@ -40,6 +40,7 @@ def main() -> None:
     apply_global_styles()
     st.title("Customer Pain Point Discovery Agent")
     query = render_query_input()
+    show_debug_panel = os.getenv("SHOW_DEBUG_PANEL", "").strip().lower() in {"1", "true", "yes", "on"}
 
     if st.button("Analyze"):
         try:
@@ -74,33 +75,36 @@ def main() -> None:
             return
 
         render_results(results)
-        
-        # Debug panel
-        with st.expander("🔍 Debug & Logs", expanded=False):
-            st.subheader("Execution Metadata")
-            metadata = results.get("metadata", {})
-            st.json({
-                "query": results.get("query", ""),
-                "tools_used": metadata.get("tools_used", []),
-                "execution_time_seconds": round(metadata.get("execution_time", 0), 2),
-                "total_sources_searched": metadata.get("total_sources_searched", 0),
-                "api_costs": metadata.get("api_costs", 0.0),
-            })
-            
-            if "error" in results:
-                st.subheader("Error Details")
-                st.json(results["error"])
-            
-            st.subheader("View Logs")
-            st.info(
-                "📝 Logs are displayed in the terminal where you ran `streamlit run app/streamlit_app.py`. "
-                "To see more detailed logs, set the environment variable:\n\n"
-                "```bash\n"
-                "export LOG_LEVEL=DEBUG\n"
-                "export AGENT_VERBOSE=true\n"
-                "streamlit run app/streamlit_app.py\n"
-                "```"
-            )
+
+        if show_debug_panel:
+            with st.expander("🔍 Debug & Logs", expanded=False):
+                st.subheader("Execution Metadata")
+                metadata = results.get("metadata", {})
+                st.json(
+                    {
+                        "query": results.get("query", ""),
+                        "tools_used": metadata.get("tools_used", []),
+                        "execution_time_seconds": round(metadata.get("execution_time", 0), 2),
+                        "total_sources_searched": metadata.get("total_sources_searched", 0),
+                        "api_costs": metadata.get("api_costs", 0.0),
+                    }
+                )
+
+                if "error" in results:
+                    st.subheader("Error Details")
+                    st.json(results["error"])
+
+                st.subheader("View Logs")
+                st.info(
+                    "📝 Logs are displayed in the terminal where you ran `streamlit run app/streamlit_app.py`. "
+                    "To see more detailed logs, set the environment variable:\n\n"
+                    "```bash\n"
+                    "export LOG_LEVEL=DEBUG\n"
+                    "export AGENT_VERBOSE=true\n"
+                    "export SHOW_DEBUG_PANEL=true\n"
+                    "streamlit run app/streamlit_app.py\n"
+                    "```"
+                )
 
 
 if __name__ == "__main__":
