@@ -43,7 +43,10 @@ def main() -> None:
     """Render the Streamlit application."""
 
     apply_global_styles()
-    st.markdown("<div class='pp-wordmark'>CPP Agent</div>", unsafe_allow_html=True)
+    st.markdown(
+        "<div class='pp-header-bar'><div class='pp-wordmark'>CPP Agent</div></div>",
+        unsafe_allow_html=True,
+    )
     st.title("Customer Pain Point Discovery Agent")
 
     render_query_presets()
