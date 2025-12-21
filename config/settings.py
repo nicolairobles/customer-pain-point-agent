@@ -46,6 +46,10 @@ class AggregationSettings:
     google_source_weight: float = float(os.getenv("AGGREGATION_GOOGLE_WEIGHT", "0.9"))
     default_source_weight: float = float(os.getenv("AGGREGATION_DEFAULT_WEIGHT", "0.75"))
     extra_source_weights: Dict[str, float] = field(default_factory=dict)
+    # Confidence calculation weights
+    confidence_base: float = float(os.getenv("AGGREGATION_CONFIDENCE_BASE", "0.35"))
+    confidence_source_weight: float = float(os.getenv("AGGREGATION_CONFIDENCE_SOURCE_WEIGHT", "0.25"))
+    confidence_recency_weight: float = float(os.getenv("AGGREGATION_CONFIDENCE_RECENCY_WEIGHT", "0.4"))
 
 
 @dataclass(frozen=True)

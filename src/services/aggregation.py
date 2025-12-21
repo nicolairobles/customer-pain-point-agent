@@ -33,6 +33,10 @@ class CrossSourceAggregator:
         self.reddit_source_weight = getattr(agg_settings, "reddit_source_weight", 1.0)
         self.google_source_weight = getattr(agg_settings, "google_source_weight", 0.9)
         self.default_source_weight = getattr(agg_settings, "default_source_weight", 0.75)
+        # Confidence calculation weights
+        self.confidence_base = getattr(agg_settings, "confidence_base", 0.35)
+        self.confidence_source_weight = getattr(agg_settings, "confidence_source_weight", 0.25)
+        self.confidence_recency_weight = getattr(agg_settings, "confidence_recency_weight", 0.4)
 
     def aggregate(
         self,
@@ -152,9 +156,14 @@ class CrossSourceAggregator:
         aggregate_score = base_weight * (
             (self.recency_weight * recency_score) + (self.engagement_weight * engagement_score)
         )
+        # Confidence = base + (sources contribution) + (recency contribution)
+        # Base provides minimum confidence; source count rewards corroboration;
+        # recency ensures recent signals are more trustworthy
         confidence = min(
             1.0,
-            0.35 + 0.25 * len(item.get("sources", [])) + 0.4 * recency_score,
+            self.confidence_base
+            + self.confidence_source_weight * len(item.get("sources", []))
+            + self.confidence_recency_weight * recency_score,
         )
 
         rendered = dict(item)
