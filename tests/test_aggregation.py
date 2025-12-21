@@ -140,3 +140,149 @@ def test_aggregation_performance_for_large_input():
     result = aggregator.aggregate(items)
     assert 0 < result.metadata["deduped_items"] <= 100
     assert result.metadata["processing_time_seconds"] < 2.0
+
+
+def test_parse_timestamp_handles_none_empty_and_zero():
+    """Test that None, empty string, and zero return None."""
+    settings = make_settings()
+    aggregator = CrossSourceAggregator(settings)
+
+    assert aggregator._parse_timestamp(None) is None
+    assert aggregator._parse_timestamp("") is None
+    assert aggregator._parse_timestamp(0) is None
+
+
+def test_parse_timestamp_handles_integer_timestamps():
+    """Test parsing of integer Unix timestamps."""
+    settings = make_settings()
+    aggregator = CrossSourceAggregator(settings)
+
+    # Valid Unix timestamp (2024-01-01 00:00:00 UTC)
+    timestamp = 1704067200
+    result = aggregator._parse_timestamp(timestamp)
+    assert result is not None
+    assert result.year == 2024
+    assert result.month == 1
+    assert result.day == 1
+    assert result.tzinfo == timezone.utc
+
+
+def test_parse_timestamp_handles_float_timestamps():
+    """Test parsing of float Unix timestamps."""
+    settings = make_settings()
+    aggregator = CrossSourceAggregator(settings)
+
+    # Valid Unix timestamp with fractional seconds
+    timestamp = 1704067200.5
+    result = aggregator._parse_timestamp(timestamp)
+    assert result is not None
+    assert result.year == 2024
+    assert result.tzinfo == timezone.utc
+
+
+def test_parse_timestamp_handles_iso_strings():
+    """Test parsing of ISO 8601 formatted strings."""
+    settings = make_settings()
+    aggregator = CrossSourceAggregator(settings)
+
+    # ISO 8601 with Z suffix
+    iso_z = "2024-01-01T00:00:00Z"
+    result = aggregator._parse_timestamp(iso_z)
+    assert result is not None
+    assert result.year == 2024
+    assert result.month == 1
+    assert result.day == 1
+    assert result.tzinfo == timezone.utc
+
+    # ISO 8601 with +00:00 offset
+    iso_offset = "2024-01-01T00:00:00+00:00"
+    result = aggregator._parse_timestamp(iso_offset)
+    assert result is not None
+    assert result.year == 2024
+    assert result.tzinfo == timezone.utc
+
+
+def test_parse_timestamp_handles_numeric_strings():
+    """Test parsing of numeric strings as Unix timestamps."""
+    settings = make_settings()
+    aggregator = CrossSourceAggregator(settings)
+
+    # String representation of Unix timestamp
+    timestamp_str = "1704067200"
+    result = aggregator._parse_timestamp(timestamp_str)
+    assert result is not None
+    assert result.year == 2024
+    assert result.month == 1
+    assert result.day == 1
+    assert result.tzinfo == timezone.utc
+
+    # String with fractional seconds
+    timestamp_float_str = "1704067200.5"
+    result = aggregator._parse_timestamp(timestamp_float_str)
+    assert result is not None
+    assert result.year == 2024
+    assert result.tzinfo == timezone.utc
+
+
+def test_parse_timestamp_handles_value_error():
+    """Test that ValueError is caught and returns None."""
+    settings = make_settings()
+    aggregator = CrossSourceAggregator(settings)
+
+    # Invalid ISO string
+    invalid_iso = "not-a-valid-date"
+    result = aggregator._parse_timestamp(invalid_iso)
+    assert result is None
+
+    # Invalid numeric string
+    invalid_numeric = "invalid123"
+    result = aggregator._parse_timestamp(invalid_numeric)
+    assert result is None
+
+
+def test_parse_timestamp_handles_os_error():
+    """Test that OSError is caught and returns None."""
+    settings = make_settings()
+    aggregator = CrossSourceAggregator(settings)
+
+    # Timestamp before epoch on some systems (e.g., Windows)
+    # -1 is before Unix epoch and may raise OSError
+    negative_timestamp = -1
+    result = aggregator._parse_timestamp(negative_timestamp)
+    # Should either return None or a valid datetime, depending on platform
+    # The important part is it doesn't crash
+    assert result is None or isinstance(result, datetime)
+
+
+def test_parse_timestamp_handles_overflow_error():
+    """Test that OverflowError is caught and returns None."""
+    settings = make_settings()
+    aggregator = CrossSourceAggregator(settings)
+
+    # Extremely large timestamp that causes overflow
+    huge_timestamp = 10**15
+    result = aggregator._parse_timestamp(huge_timestamp)
+    assert result is None
+
+    # Extremely small timestamp
+    small_timestamp = -(10**15)
+    result = aggregator._parse_timestamp(small_timestamp)
+    assert result is None
+
+
+def test_parse_timestamp_handles_unsupported_types():
+    """Test that unsupported types return None."""
+    settings = make_settings()
+    aggregator = CrossSourceAggregator(settings)
+
+    # List, dict, or other unsupported types
+    result = aggregator._parse_timestamp([1704067200])
+    assert result is None
+
+    result = aggregator._parse_timestamp({"timestamp": 1704067200})
+    assert result is None
+
+    # Note: bool is a subclass of int in Python, so True/False are treated as 1/0
+    # This is expected behavior, so we test with other unsupported types instead
+    result = aggregator._parse_timestamp(complex(1, 2))
+    assert result is None
