@@ -53,6 +53,9 @@ pip install -r requirements.txt
 streamlit run app/streamlit_app.py
 ```
 
+### Streamlit Community Cloud (UI-based deployment)
+See `docs/deployment/streamlit-community-cloud.md`.
+
 ## Health checks and monitoring
 
 - The container `HEALTHCHECK` runs `scripts/healthcheck.py` against `http://localhost:8501/` to ensure the app is reachable and secrets are present.
