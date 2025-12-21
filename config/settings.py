@@ -73,6 +73,8 @@ class AggregationSettings:
             normalized_engagement = self.engagement_weight / total
             object.__setattr__(self, "recency_weight", normalized_recency)
             object.__setattr__(self, "engagement_weight", normalized_engagement)
+
+
 @dataclass(frozen=True)
 class BudgetSettings:
     """Tracks cost constraints for API usage."""
