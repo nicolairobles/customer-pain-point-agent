@@ -19,9 +19,11 @@ Set these as environment secrets in your hosting platform (or GitHub Actions env
 | `OPENAI_API_KEY` | LLM requests | Yes |
 | `REDDIT_CLIENT_ID` / `REDDIT_CLIENT_SECRET` | Reddit API credentials | Yes |
 | `REDDIT_USER_AGENT` | Identifies client to Reddit | Recommended |
-| `GOOGLE_SEARCH_API_KEY` / `GOOGLE_SEARCH_ENGINE_ID` | Google Custom Search | Yes (when search is enabled) |
+| `GOOGLE_SEARCH_API_KEY` / `GOOGLE_SEARCH_ENGINE_ID` | Google Custom Search | Yes |
 | `TWITTER_BEARER_TOKEN` | Reserved for future Twitter ingestion | Optional |
 | `STREAMLIT_SERVER_PORT` | Overrides default port | Optional |
+
+In production, the healthcheck script treats `GOOGLE_SEARCH_API_KEY` and `GOOGLE_SEARCH_ENGINE_ID` as required secrets; if you intentionally run without search, either provide placeholder values or use `--allow-missing-secrets` for non-production checks.
 
 For GitHub Actions publishing, `GITHUB_TOKEN` (provided by GitHub) authenticates to GHCR. Deploy-time secrets should be injected by the runtime (Kubernetes/VM host/Streamlit Community Cloud) rather than stored in the image.
 
@@ -65,7 +67,7 @@ python scripts/healthcheck.py --url https://<your-host>/ --timeout 10 --allow-mi
 3. If the regression is dependency-related, revert the offending commit in `requirements.txt`/`Dockerfile` and redeploy.
 4. Flush Streamlit caches after rollback:
    - Container: restart the container; the cache lives in the container filesystem and clears on restart.
-   - VM/manual: remove `~/.streamlit` cache and restart the process.
+   - VM/manual: remove `~/.streamlit/cache` and restart the process.
 5. Document the incident and follow up with a postmortem if monitors fired.
 
 ## Smoke testing and drills

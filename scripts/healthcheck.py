@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+import urllib.error
 import urllib.request
 from typing import Sequence
 
@@ -15,7 +16,6 @@ REQUIRED_KEYS: tuple[str, ...] = (
     "GOOGLE_SEARCH_API_KEY",
     "GOOGLE_SEARCH_ENGINE_ID",
 )
-OPTIONAL_KEYS: tuple[str, ...] = ("TWITTER_BEARER_TOKEN",)
 DEFAULT_URL = "http://localhost:8501/"
 
 
@@ -31,7 +31,8 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(list(argv) if argv is not None else None)
 
 
-def find_missing_required_keys(allow_missing_secrets: bool) -> list[str]:
+def get_missing_required_keys(allow_missing_secrets: bool) -> list[str]:
+    """Return missing required keys, or empty list if allow_missing_secrets is True."""
     if allow_missing_secrets:
         return []
     return [key for key in REQUIRED_KEYS if not os.getenv(key)]
@@ -46,7 +47,7 @@ def probe_url(url: str, timeout: float) -> int:
 def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
 
-    missing_keys = find_missing_required_keys(args.allow_missing_secrets)
+    missing_keys = get_missing_required_keys(args.allow_missing_secrets)
     if missing_keys:
         sys.stderr.write(f"Missing required secrets: {', '.join(missing_keys)}\n")
         sys.stderr.flush()
@@ -54,12 +55,20 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     try:
         status = probe_url(args.url, args.timeout)
+    except urllib.error.URLError as exc:
+        sys.stderr.write(f"Health probe connection failed: {exc.reason}\n")
+        sys.stderr.flush()
+        return 1
+    except TimeoutError as exc:
+        sys.stderr.write(f"Health probe timed out after {args.timeout}s: {exc}\n")
+        sys.stderr.flush()
+        return 1
     except Exception as exc:  # noqa: BLE001
-        sys.stderr.write(f"Health probe failed: {exc}\n")
+        sys.stderr.write(f"Health probe failed with unexpected error: {exc}\n")
         sys.stderr.flush()
         return 1
 
-    if status >= 400:
+    if status < 200 or status >= 400:
         sys.stderr.write(f"Health probe returned HTTP {status}\n")
         sys.stderr.flush()
         return 1
