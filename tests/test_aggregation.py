@@ -270,6 +270,25 @@ def test_parse_timestamp_handles_overflow_error():
     assert result is None
 
 
+def test_parse_timestamp_handles_boolean_as_int():
+    """Test that booleans are treated as integers (True=1, False=0)."""
+    settings = make_settings()
+    aggregator = CrossSourceAggregator(settings)
+
+    # In Python, bool is a subclass of int, so True/False are treated as 1/0
+    # True should be treated as timestamp 1 (1970-01-01 00:00:01 UTC)
+    result = aggregator._parse_timestamp(True)
+    assert result is not None
+    assert result.year == 1970
+    assert result.month == 1
+    assert result.day == 1
+    assert result.second == 1
+
+    # False should be treated as 0, which returns None (handled as special case)
+    result = aggregator._parse_timestamp(False)
+    assert result is None
+
+
 def test_parse_timestamp_handles_unsupported_types():
     """Test that unsupported types return None."""
     settings = make_settings()
@@ -282,7 +301,5 @@ def test_parse_timestamp_handles_unsupported_types():
     result = aggregator._parse_timestamp({"timestamp": 1704067200})
     assert result is None
 
-    # Note: bool is a subclass of int in Python, so True/False are treated as 1/0
-    # This is expected behavior, so we test with other unsupported types instead
     result = aggregator._parse_timestamp(complex(1, 2))
     assert result is None
