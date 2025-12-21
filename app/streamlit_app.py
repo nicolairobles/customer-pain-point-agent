@@ -43,9 +43,38 @@ def main() -> None:
     """Render the Streamlit application."""
 
     apply_global_styles()
+    st.logo("app/assets/logo.png", size="small")
     st.title("Customer Pain Point Discovery Agent")
+    st.caption(
+        "Search real customer conversations, deduplicate results, and generate a cited analyst-style report of recurring pain points."
+    )
 
     render_query_presets()
+
+    first_visit = "onboarding_seen" not in st.session_state
+    with st.expander("Getting started", expanded=first_visit):
+        st.markdown(
+            "\n".join(
+                [
+                    "**What to enter**",
+                    "- A short natural-language query describing the customer segment + context.",
+                    "- Supported input: **text only** (1–50 words).",
+                    "",
+                    "**Good examples**",
+                    "- `customers struggling with onboarding to analytics dashboards`",
+                    "- `SMB finance teams frustrated with expense approvals in Xero alternatives`",
+                    "",
+                    "**Bad examples**",
+                    "- A full paragraph with multiple unrelated topics",
+                    "- Raw URLs or CSV files (not supported yet)",
+                ]
+            )
+        )
+        if first_visit:
+            if st.button("Got it", type="secondary"):
+                st.session_state["onboarding_seen"] = True
+                st.rerun()
+    st.session_state.setdefault("onboarding_seen", True)
 
     with st.form("analyze_form", clear_on_submit=False, border=False):
         query = render_query_text_area()
