@@ -98,6 +98,24 @@ def get_global_css() -> str:
         box-shadow: 0 0 0 3px rgba(159, 122, 234, 0.25);
     }
 
+    /* BaseWeb wrappers (Streamlit form + widgets) */
+    div[data-baseweb="textarea"] > div {
+        border-radius: 18px !important;
+        border: 1px solid var(--color-border) !important;
+        background: #ffffff !important;
+        box-shadow: inset 0 1px 4px rgba(45, 27, 61, 0.05) !important;
+    }
+
+    div[data-baseweb="textarea"] > div:focus-within {
+        border-color: var(--color-accent) !important;
+        box-shadow: 0 0 0 3px rgba(159, 122, 234, 0.25) !important;
+    }
+
+    div[data-baseweb="textarea"] textarea {
+        border-radius: 18px !important;
+        background: transparent !important;
+    }
+
     div[data-baseweb="select"] > div {
         border-radius: 18px !important;
         border: 1px solid var(--color-border) !important;
@@ -108,6 +126,13 @@ def get_global_css() -> str:
 
     .stMarkdown ul {
         padding-left: 1.25rem;
+    }
+
+    /* Forms: avoid extra border/padding causing "boxed" look */
+    [data-testid="stForm"] {
+        border: none;
+        padding: 0;
+        background: transparent;
     }
 
     .stTabs [data-baseweb="tab-list"] {
