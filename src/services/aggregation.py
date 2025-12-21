@@ -147,7 +147,14 @@ class CrossSourceAggregator:
     def _score_item(self, item: Dict[str, Any]) -> Dict[str, Any]:
         recency_score = self._calculate_recency_score(item.get("_parsed_created_at"))
         engagement_score = self._normalize_engagement(item.get("engagement_signal", 0.0))
-        base_weight = float(item.get("source_weight") or 0.0) or self.default_source_weight
+        source_weight = item.get("source_weight")
+        if source_weight is None:
+            base_weight = self.default_source_weight
+        else:
+            try:
+                base_weight = float(source_weight)
+            except (TypeError, ValueError):
+                base_weight = self.default_source_weight
 
         aggregate_score = base_weight * (
             (self.recency_weight * recency_score) + (self.engagement_weight * engagement_score)
