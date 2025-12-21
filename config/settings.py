@@ -42,6 +42,7 @@ class AggregationSettings:
     engagement_weight: float = float(os.getenv("AGGREGATION_ENGAGEMENT_WEIGHT", "0.45"))
     max_item_age_days: int = int(os.getenv("AGGREGATION_MAX_ITEM_AGE_DAYS", "365"))
     near_duplicate_threshold: float = float(os.getenv("AGGREGATION_NEAR_DUPLICATE_THRESHOLD", "0.82"))
+    comment_weight: float = float(os.getenv("AGGREGATION_COMMENT_WEIGHT", "0.5"))
     reddit_source_weight: float = float(os.getenv("AGGREGATION_REDDIT_WEIGHT", "1.0"))
     google_source_weight: float = float(os.getenv("AGGREGATION_GOOGLE_WEIGHT", "0.9"))
     default_source_weight: float = float(os.getenv("AGGREGATION_DEFAULT_WEIGHT", "0.75"))
