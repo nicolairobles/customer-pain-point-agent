@@ -10,6 +10,7 @@ def make_settings(**overrides):
         engagement_weight=overrides.get("engagement_weight", 0.4),
         max_item_age_days=overrides.get("max_item_age_days", 365),
         near_duplicate_threshold=overrides.get("near_duplicate_threshold", 0.8),
+        comment_weight=overrides.get("comment_weight", 0.5),
         reddit_source_weight=overrides.get("reddit_source_weight", 1.0),
         google_source_weight=overrides.get("google_source_weight", 0.85),
         default_source_weight=overrides.get("default_source_weight", 0.7),
@@ -140,3 +141,49 @@ def test_aggregation_performance_for_large_input():
     result = aggregator.aggregate(items)
     assert 0 < result.metadata["deduped_items"] <= 100
     assert result.metadata["processing_time_seconds"] < 2.0
+
+
+def test_configurable_comment_weight():
+    """Test that comment_weight configuration affects engagement calculation."""
+    now = datetime.now(timezone.utc)
+    
+    # Item with 10 upvotes and 10 comments
+    item = {
+        "id": "test-1",
+        "title": "Test item",
+        "text": "Test content",
+        "url": "https://example.com/test",
+        "platform": "reddit_search",
+        "created_at": now.isoformat(),
+        "upvotes": 10,
+        "comments": 10,
+    }
+    
+    # Test with default comment_weight (0.5)
+    settings_default = make_settings(comment_weight=0.5)
+    aggregator_default = CrossSourceAggregator(settings_default)
+    engagement_default = aggregator_default._calculate_engagement(item)
+    # Should be: 10 + (10 * 0.5) = 15.0
+    assert engagement_default == 15.0
+    
+    # Test with higher comment_weight (1.0) - comments valued equally to votes
+    settings_high = make_settings(comment_weight=1.0)
+    aggregator_high = CrossSourceAggregator(settings_high)
+    engagement_high = aggregator_high._calculate_engagement(item)
+    # Should be: 10 + (10 * 1.0) = 20.0
+    assert engagement_high == 20.0
+    
+    # Test with lower comment_weight (0.25) - comments valued less
+    settings_low = make_settings(comment_weight=0.25)
+    aggregator_low = CrossSourceAggregator(settings_low)
+    engagement_low = aggregator_low._calculate_engagement(item)
+    # Should be: 10 + (10 * 0.25) = 12.5
+    assert engagement_low == 12.5
+    
+    # Test that higher comment weight results in higher aggregation score
+    # when all else is equal
+    result_default = aggregator_default.aggregate([item])
+    result_high = aggregator_high.aggregate([item])
+    # With higher comment weight, same item should get higher score
+    assert result_high.items[0]["aggregation_score"] > result_default.items[0]["aggregation_score"]
+

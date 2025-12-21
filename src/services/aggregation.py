@@ -30,6 +30,7 @@ class CrossSourceAggregator:
         self.engagement_weight = getattr(agg_settings, "engagement_weight", 0.45)
         self.max_item_age_days = getattr(agg_settings, "max_item_age_days", 365)
         self.near_duplicate_threshold = getattr(agg_settings, "near_duplicate_threshold", 0.82)
+        self.comment_weight = getattr(agg_settings, "comment_weight", 0.5)
         self.reddit_source_weight = getattr(agg_settings, "reddit_source_weight", 1.0)
         self.google_source_weight = getattr(agg_settings, "google_source_weight", 0.9)
         self.default_source_weight = getattr(agg_settings, "default_source_weight", 0.75)
@@ -281,9 +282,20 @@ class CrossSourceAggregator:
         return max(0.0, 1.0 - normalized_age)
 
     def _calculate_engagement(self, item: Mapping[str, Any]) -> float:
+        """Calculate engagement signal from votes and comments.
+        
+        Combines upvotes/score with comments using a configurable weight.
+        The comment_weight reflects that comments typically indicate deeper
+        engagement than votes, but may be valued differently across platforms.
+        For example, on Reddit a comment often signals strong interest, while
+        on other platforms voting might be the primary engagement mechanism.
+        
+        Default weight of 0.5 means: engagement = votes + (comments * 0.5)
+        This implies 2 comments ≈ 1 upvote in terms of engagement value.
+        """
         votes = float(item.get("upvotes") or item.get("score") or 0.0)
         comments = float(item.get("comments") or 0.0)
-        return votes + (comments * 0.5)
+        return votes + (comments * self.comment_weight)
 
     def _normalize_engagement(self, engagement_signal: float) -> float:
         if engagement_signal <= 0:
