@@ -15,7 +15,7 @@ DELIVERABLES
 └── 1.4 Basic Streamlit UI
 
 2.0 PHASE 2: MULTI-SOURCE INTEGRATION
-├── 2.1 Optional Third-Source Integration (TBD)
+├── 2.1 Twitter/X API Integration
 ├── 2.2 Google Search API Integration
 ├── 2.3 Multi-Tool Agent Orchestration
 └── 2.4 Enhanced UI (filters, export)
@@ -302,16 +302,52 @@ Story Link:
 [Detailed Story](https://github.com/nicolairobles/customer-pain-point-agent/blob/master/docs/stories/1.5.3-push-to-github.md)
 
 ```
-Activity ID: 2.1.x
-Activity: Decide third source or rescope
-Description: Twitter/X removed from scope due to API constraints; decide whether to replace it or rescope to 2 sources.
-Work Package: 3.1.x Product Decision
+Activity ID: 2.1.1
+Activity: Design Twitter API wrapper interface
+Description: Define signatures, configuration, and schema for Twitter integration
+Work Package: 3.1.1 Twitter Wrapper Design
 Duration: 1 hour
-Story Points: 1
-Owner: Al
+Story Points: 3
+Owner: Stefan
 Story Link:
 ```
-[Project Issue](../../issues/generated/2.1.5_decide-third-source-or-rescope-requirements.md)
+[Detailed Story](https://github.com/nicolairobles/customer-pain-point-agent/blob/master/docs/stories/2.1.1-design-twitter-api-wrapper-interface.md)
+
+```
+Activity ID: 2.1.2
+Activity: Implement Twitter search functionality
+Description: Build Twitter tool that queries tweets with filters and logging
+Work Package: 3.1.2 Twitter Search Implementation
+Duration: 4 hours
+Story Points: 5
+Owner: Edison
+Story Link:
+```
+[Detailed Story](https://github.com/nicolairobles/customer-pain-point-agent/blob/master/docs/stories/2.1.2-implement-twitter-search-functionality.md)
+
+```
+Activity ID: 2.1.3
+Activity: Implement Twitter data parsing
+Description: Normalize tweet payloads into shared schema
+Work Package: 3.1.3 Twitter Data Parsing
+Duration: 3 hours
+Story Points: 3
+Owner: Javier
+Story Link:
+```
+[Detailed Story](https://github.com/nicolairobles/customer-pain-point-agent/blob/master/docs/stories/2.1.3-implement-twitter-data-parsing.md)
+
+```
+Activity ID: 2.1.4
+Activity: Write unit tests for Twitter tool
+Description: Cover success, failure, and normalization cases for Twitter integration
+Work Package: 3.1.4 Twitter Tool Testing
+Duration: 2 hours
+Story Points: 2
+Owner: Amanda
+Story Link:
+```
+[Detailed Story](https://github.com/nicolairobles/customer-pain-point-agent/blob/master/docs/stories/2.1.4-write-unit-tests-for-twitter-tool.md)
 
 ```
 Activity ID: 2.2.1
@@ -364,7 +400,7 @@ Story Link:
 ```
 Activity ID: 2.3.1
 Activity: Register new tools with agent
-Description: Add Google tool to agent configuration with guards
+Description: Add Twitter and Google tools to agent configuration with guards
 Work Package: 3.3.1 Agent Tool Registration
 Duration: 2 hours
 Story Points: 3
@@ -434,6 +470,100 @@ Story Link:
 [Detailed Story](https://github.com/nicolairobles/customer-pain-point-agent/blob/master/docs/stories/2.4.3-enhance-ui-feedback.md)
 
 ```
+PHASE 3: ENHANCEMENT & POLISH
+
+```
+Activity ID: 3.1.1
+Activity: Harden error handling and retries
+Description: Introduce resilient error handling, structured logging, and retry/backoff policies.
+Work Package: 3.1 Error Handling & Retry Logic
+Duration: 3 hours
+Owner: TBD
+Issue Link:
+```
+[Generated Issue](https://github.com/nicolairobles/customer-pain-point-agent/blob/master/issues/generated/3.1.1_harden-error-handling-and-retries.md)
+
+```
+Activity ID: 3.2.1
+Activity: Optimize agent performance
+Description: Profile and improve end-to-end latency with caching, concurrency, and instrumentation.
+Work Package: 3.2 Performance Optimization
+Duration: 3 hours
+Owner: TBD
+Issue Link:
+```
+[Generated Issue](https://github.com/nicolairobles/customer-pain-point-agent/blob/master/issues/generated/3.2.1_optimize-agent-performance.md)
+
+```
+Activity ID: 3.3.1
+Activity: Enhance Streamlit UX
+Description: Improve accessibility, responsive layout, and micro-interactions in the Streamlit app.
+Work Package: 3.3 UI/UX Improvements
+Duration: 2 hours
+Owner: TBD
+Issue Link:
+```
+[Generated Issue](https://github.com/nicolairobles/customer-pain-point-agent/blob/master/issues/generated/3.3.1_enhance-streamlit-ux.md)
+
+```
+Activity ID: 3.4.1
+Activity: Expand automated test coverage
+Description: Build comprehensive integration, regression, and coverage tooling for the agent.
+Work Package: 3.4 Comprehensive Testing
+Duration: 3 hours
+Owner: TBD
+Issue Link:
+```
+[Generated Issue](https://github.com/nicolairobles/customer-pain-point-agent/blob/master/issues/generated/3.4.1_expand-test-coverage.md)
+
+```
+PHASE 4: DEPLOYMENT & DOCUMENTATION
+
+```
+Activity ID: 4.1.1
+Activity: Prepare production deployment
+Description: Automate deployment and monitoring for the Streamlit application.
+Work Package: 4.1 Production Deployment
+Duration: 3 hours
+Owner: TBD
+Issue Link:
+```
+[Generated Issue](https://github.com/nicolairobles/customer-pain-point-agent/blob/master/issues/generated/4.1.1_prepare-production-deployment.md)
+
+```
+Activity ID: 4.2.1
+Activity: Complete project documentation
+Description: Finalise setup, user, and developer documentation for launch.
+Work Package: 4.2 Documentation
+Duration: 2 hours
+Owner: TBD
+Issue Link:
+```
+[Generated Issue](https://github.com/nicolairobles/customer-pain-point-agent/blob/master/issues/generated/4.2.1_complete-project-documentation.md)
+
+```
+Activity ID: 4.3.1
+Activity: Create demo video
+Description: Script and produce a polished walkthrough video for stakeholders.
+Work Package: 4.3 Demo Video Creation
+Duration: 2 hours
+Owner: TBD
+Issue Link:
+```
+[Generated Issue](https://github.com/nicolairobles/customer-pain-point-agent/blob/master/issues/generated/4.3.1_create-demo-video.md)
+
+```
+Activity ID: 4.4.1
+Activity: Conduct team knowledge transfer
+Description: Share project knowledge, onboard successors, and define support rotation.
+Work Package: 4.4 Team Knowledge Transfer
+Duration: 1.5 hours
+Owner: TBD
+Issue Link:
+```
+[Generated Issue](https://github.com/nicolairobles/customer-pain-point-agent/blob/master/issues/generated/4.4.1_conduct-team-knowledge-transfer.md)
+
+```
 
 PHASE 5: MAINTENANCE & OPERATIONS
 
@@ -458,4 +588,5 @@ Owner: TBD
 Issue Link:
 ```
 [Generated Issue](https://github.com/nicolairobles/customer-pain-point-agent/blob/master/issues/generated/5.1.2_implement-dependency-update-automation.md)
+
 
