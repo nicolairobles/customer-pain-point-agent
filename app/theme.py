@@ -303,22 +303,33 @@ def get_global_css() -> str:
 
     @keyframes ppDotPulse {
         0% {
-            box-shadow: 0 0 0 1px rgba(127, 86, 217, 0.20), 0 0 0 0 rgba(34, 211, 238, 0.0);
-            transform: scale(1);
+            opacity: 0.55;
+            box-shadow:
+                0 0 0 1px rgba(127, 86, 217, 0.18),
+                0 0 0 0 rgba(34, 211, 238, 0.0);
+            transform: scale(0.98);
         }
         50% {
-            box-shadow: 0 0 0 1px rgba(127, 86, 217, 0.26), 0 0 16px rgba(34, 211, 238, 0.30);
-            transform: scale(1.05);
+            opacity: 1;
+            box-shadow:
+                0 0 0 1px rgba(127, 86, 217, 0.34),
+                0 0 18px rgba(127, 86, 217, 0.35),
+                0 0 28px rgba(34, 211, 238, 0.45);
+            transform: scale(1.12);
         }
         100% {
-            box-shadow: 0 0 0 1px rgba(127, 86, 217, 0.20), 0 0 0 0 rgba(34, 211, 238, 0.0);
-            transform: scale(1);
+            opacity: 0.55;
+            box-shadow:
+                0 0 0 1px rgba(127, 86, 217, 0.18),
+                0 0 0 0 rgba(34, 211, 238, 0.0);
+            transform: scale(0.98);
         }
     }
 
     .pp-step--active .pp-step-dot {
         background: linear-gradient(135deg, rgba(127, 86, 217, 0.85) 0%, rgba(34, 211, 238, 0.72) 100%);
-        animation: ppDotPulse 1.4s ease-in-out infinite;
+        filter: drop-shadow(0 0 10px rgba(34, 211, 238, 0.25));
+        animation: ppDotPulse 1.15s ease-in-out infinite;
     }
 
     .pp-step--done {
