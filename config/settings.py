@@ -47,7 +47,31 @@ class AggregationSettings:
     default_source_weight: float = float(os.getenv("AGGREGATION_DEFAULT_WEIGHT", "0.75"))
     extra_source_weights: Dict[str, float] = field(default_factory=dict)
 
+    def __post_init__(self) -> None:
+        """Validate and normalize aggregation weights loaded from the environment."""
 
+        # Ensure weights are non-negative.
+        if self.recency_weight < 0 or self.engagement_weight < 0:
+            raise ValueError(
+                "Aggregation weights must be non-negative: "
+                f"recency_weight={self.recency_weight}, engagement_weight={self.engagement_weight}"
+            )
+
+        total = self.recency_weight + self.engagement_weight
+
+        # Prevent a zero or negative total, which would break normalization and scoring semantics.
+        if total <= 0:
+            raise ValueError(
+                "Sum of aggregation weights must be positive: "
+                f"recency_weight={self.recency_weight}, engagement_weight={self.engagement_weight}"
+            )
+
+        # If the weights do not sum to 1.0, normalize them so they behave as proper weights.
+        if total != 1.0:
+            normalized_recency = self.recency_weight / total
+            normalized_engagement = self.engagement_weight / total
+            object.__setattr__(self, "recency_weight", normalized_recency)
+            object.__setattr__(self, "engagement_weight", normalized_engagement)
 @dataclass(frozen=True)
 class BudgetSettings:
     """Tracks cost constraints for API usage."""
