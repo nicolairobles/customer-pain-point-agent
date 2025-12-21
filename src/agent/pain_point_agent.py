@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import time
 from time import perf_counter
-from typing import Any, Dict, Iterable, List, Mapping, Sequence
+from typing import Any, Callable, Dict, Iterable, List, Mapping, Sequence
 
 from config.settings import settings
 from src.agent.orchestrator import build_agent_executor
@@ -15,13 +15,13 @@ _INITIAL_BACKOFF_SECONDS = 1.0
 _BACKOFF_MULTIPLIER = 2.0
 
 
-def create_agent() -> Any:
+def create_agent(*, progress_callback: Callable[[Dict[str, Any]], None] | None = None) -> Any:
     """Instantiate and return the configured LangChain agent executor."""
 
-    return build_agent_executor(settings)
+    return build_agent_executor(settings, progress_callback=progress_callback)
 
 
-def run_agent(query: str) -> Dict[str, Any]:
+def run_agent(query: str, *, progress_callback: Callable[[Dict[str, Any]], None] | None = None) -> Dict[str, Any]:
     """Execute the agent for the provided query and return structured results.
 
     Args:
@@ -33,7 +33,10 @@ def run_agent(query: str) -> Dict[str, Any]:
     """
 
     normalized_query = _validate_query(query)
-    executor = create_agent()
+    if progress_callback is None:
+        executor = create_agent()
+    else:
+        executor = create_agent(progress_callback=progress_callback)
 
     backoff = _INITIAL_BACKOFF_SECONDS
     start_time = perf_counter()
@@ -41,6 +44,10 @@ def run_agent(query: str) -> Dict[str, Any]:
     last_error: Exception | None = None
     for attempt in range(_MAX_RETRY_ATTEMPTS):
         try:
+            if progress_callback is not None and attempt > 0:
+                progress_callback(
+                    {"type": "retry", "attempt": attempt + 1, "message": "Retrying after transient failure…"}
+                )
             result = executor.invoke({"input": normalized_query})
             break
         except ValidationError:

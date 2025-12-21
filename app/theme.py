@@ -4,24 +4,26 @@ from __future__ import annotations
 
 import streamlit as st
 
+
 def get_global_css() -> str:
     """Return the global CSS overrides for the Streamlit app."""
 
     return """
     <style>
     :root {
-        --color-background: #f5f0fa;
-        --color-background-gradient: radial-gradient(140% 120% at 10% 0%, #fcfbff 0%, #f0e6fb 45%, #e4d4ff 100%);
-        --color-surface: rgba(239, 234, 242, 0.95);
-        --color-surface-muted: rgba(239, 234, 242, 0.75);
-        --color-text-primary: #2d1b3d;
-        --color-text-secondary: #7a708b;
-        --color-accent: #9f7aea;
-        --color-accent-hover: #8157d0;
-        --color-focus: #be93f7;
-        --color-border: rgba(125, 109, 155, 0.25);
-        --shadow-md: 0 18px 40px rgba(45, 27, 61, 0.12);
-        --font-primary: "Lato", "Helvetica Neue", sans-serif;
+        --color-background: #fbfbfe;
+        --color-background-gradient: radial-gradient(120% 140% at 10% 0%, #ffffff 0%, #f6f7ff 42%, #f1eaff 100%);
+        --color-surface: rgba(255, 255, 255, 0.62);
+        --color-surface-muted: rgba(255, 255, 255, 0.46);
+        --color-text-primary: #141025;
+        --color-text-secondary: rgba(20, 16, 37, 0.62);
+        --color-accent: #7f56d9;
+        --color-accent-hover: #6a46c5;
+        --color-focus: rgba(127, 86, 217, 0.35);
+        --color-border: rgba(20, 16, 37, 0.10);
+        --color-neon: #22d3ee;
+        --shadow-md: 0 18px 40px rgba(20, 16, 37, 0.10);
+        --font-primary: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
     }
 
     @media (prefers-color-scheme: dark) {
@@ -66,7 +68,7 @@ def get_global_css() -> str:
         color: #ffffff;
         border: none;
         padding: 0.65rem 1.8rem;
-        font-weight: 600;
+        font-weight: 500;
         letter-spacing: 0.04em;
         box-shadow: var(--shadow-md);
         transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.2s ease;
@@ -87,7 +89,7 @@ def get_global_css() -> str:
         border-radius: 18px;
         border: 1px solid var(--color-border);
         padding: 0.85rem 1.15rem;
-        background: #ffffff;
+        background: rgba(255, 255, 255, 0.75);
         font-family: var(--font-primary);
         color: var(--color-text-primary);
         box-shadow: inset 0 1px 4px rgba(45, 27, 61, 0.05);
@@ -164,12 +166,145 @@ def get_global_css() -> str:
     }
 
     section[data-testid="stSidebar"] {
-        background: rgba(36, 20, 53, 0.9);
-        color: #efeaf2;
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.75) 0%, rgba(241, 234, 255, 0.65) 100%);
+        border-right: 1px solid rgba(20, 16, 37, 0.08);
     }
 
-    section[data-testid="stSidebar"] * {
-        color: inherit !important;
+    /* Research progress panel (Perplexity-inspired) */
+    .pp-progress {
+        background: var(--color-surface);
+        border-radius: 18px;
+        padding: 16px 18px;
+        border: 1px solid rgba(255, 255, 255, 0.35);
+        box-shadow: var(--shadow-md);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+        margin-bottom: 14px;
+    }
+
+    .pp-progress-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 10px;
+    }
+
+    .pp-progress-title {
+        font-weight: 600;
+        letter-spacing: 0.02em;
+    }
+
+    .pp-progress-eta {
+        font-size: 0.9rem;
+        color: var(--color-text-secondary);
+    }
+
+    .pp-progress-status {
+        font-size: 1.02rem;
+        color: var(--color-text-primary);
+    }
+
+    .pp-steps {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin: 10px 0 12px;
+    }
+
+    .pp-step {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 10px;
+        border-radius: 999px;
+        border: 1px solid rgba(20, 16, 37, 0.10);
+        background: rgba(255, 255, 255, 0.55);
+        font-size: 0.92rem;
+    }
+
+    .pp-step--active {
+        border-color: rgba(127, 86, 217, 0.35);
+        box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.12);
+        background: linear-gradient(135deg, rgba(127, 86, 217, 0.10) 0%, rgba(34, 211, 238, 0.10) 100%);
+    }
+
+    .pp-step--done {
+        opacity: 0.75;
+    }
+
+    .pp-progress-source {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: baseline;
+        padding: 12px 14px;
+        border-radius: 16px;
+        border: 1px solid rgba(20, 16, 37, 0.08);
+        background: rgba(255, 255, 255, 0.50);
+        margin-bottom: 10px;
+    }
+
+    .pp-progress-source--empty {
+        color: var(--color-text-secondary);
+    }
+
+    .pp-source-domain {
+        font-weight: 600;
+        color: var(--color-accent);
+    }
+
+    .pp-source-title {
+        color: var(--color-text-secondary);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        max-width: 68ch;
+    }
+
+    .pp-sources {
+        background: rgba(255, 255, 255, 0.50);
+        border: 1px solid rgba(20, 16, 37, 0.08);
+        border-radius: 16px;
+        padding: 12px 14px;
+    }
+
+    .pp-sources-title {
+        font-size: 0.9rem;
+        color: var(--color-text-secondary);
+        margin-bottom: 8px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+    }
+
+    .pp-source-row {
+        display: grid;
+        grid-template-columns: 26px 1fr 2fr;
+        gap: 10px;
+        padding: 6px 0;
+        align-items: center;
+    }
+
+    .pp-source-chip {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 22px;
+        height: 22px;
+        border-radius: 8px;
+        background: rgba(127, 86, 217, 0.10);
+        border: 1px solid rgba(127, 86, 217, 0.18);
+    }
+
+    .pp-source-row-domain {
+        font-weight: 600;
+    }
+
+    .pp-source-row-title {
+        color: var(--color-text-secondary);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
 
     @media (max-width: 900px) {

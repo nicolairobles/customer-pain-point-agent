@@ -10,16 +10,20 @@ from urllib.parse import urlparse
 
 import streamlit as st
 
-from src.utils.formatters import format_duration, truncate_description
+from src.utils.formatters import format_currency, format_duration, truncate_description
 
 _RESULTS_STYLE = """
 <style>
 .pp-results-metrics {
+    position: relative;
     background: var(--color-surface);
     border-radius: 16px;
     padding: 18px;
     color: var(--color-text-primary);
     box-shadow: var(--shadow-md);
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
 }
 .pp-results-metrics h4 {
     margin: 0;
@@ -31,16 +35,23 @@ _RESULTS_STYLE = """
 .pp-results-metrics p {
     margin: 6px 0 0;
     font-size: 1.35rem;
-    font-weight: 700;
-    color: var(--color-text-primary);
+    font-weight: 600;
+    background: linear-gradient(90deg, var(--color-accent) 0%, var(--color-neon) 55%, #00f5ff 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
 }
 .pp-card {
+    position: relative;
     background: var(--color-surface);
     border-radius: 20px;
     padding: 22px 26px;
     color: var(--color-text-primary);
     box-shadow: var(--shadow-md);
     margin-bottom: 18px;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
 }
 .pp-card p {
     margin: 0 0 12px;
@@ -110,10 +121,12 @@ def build_metadata_summary(metadata: Dict[str, Any]) -> List[MetadataStat]:
 
     total_sources = metadata.get("total_sources_searched") or metadata.get("total_sources") or 0
     executions = metadata.get("execution_time") or metadata.get("execution_time_seconds") or 0.0
+    api_costs = metadata.get("api_costs") or metadata.get("cost_usd") or 0.0
 
     return [
         MetadataStat("Sources Searched", f"{int(total_sources)}"),
         MetadataStat("Execution Time", format_duration(executions)),
+        MetadataStat("API Cost", format_currency(api_costs)),
     ]
 
 
@@ -210,23 +223,30 @@ def render_results(results: Dict[str, Any]) -> None:
     _inject_styles()
 
     pain_points = normalize_pain_points(results.get("pain_points", []))
-    metadata = build_metadata_summary(results.get("metadata", {}))
+    raw_metadata = results.get("metadata", {}) if isinstance(results.get("metadata", {}), dict) else {}
+    metadata = build_metadata_summary(raw_metadata)
     errors = _coerce_message_list(results.get("errors"))
     warnings = _coerce_message_list(
         results.get("warnings")
         or results.get("partial_failures")
         or results.get("diagnostics", {}).get("warnings")  # diagnostics is optional
     )
+    warnings.extend(_coerce_message_list(raw_metadata.get("tool_errors")))
+    aggregation_meta = raw_metadata.get("aggregation") if isinstance(raw_metadata, dict) else None
+    if isinstance(aggregation_meta, dict):
+        warnings.extend(_coerce_message_list(aggregation_meta.get("errors")))
 
     if errors:
-        st.error("We ran into issues while aggregating results:")
+        st.error("We ran into issues while running the research pipeline:")
         for message in errors:
             st.markdown(f"- {_escape_markdown(message)}")
+        st.caption("Try re-running the query, shortening it, or checking API credentials/rate limits.")
 
     if warnings:
         st.warning("Partial results returned; some sources may be missing:")
         for message in warnings:
             st.markdown(f"- {_escape_markdown(message)}")
+        st.caption("The app continued with available sources. Re-run later if a provider was rate-limited.")
 
     if not pain_points and not results.get("output"):
         st.info("No pain points identified yet. Try refining your query or adjusting filters.")
