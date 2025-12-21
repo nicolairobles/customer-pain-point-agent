@@ -44,7 +44,7 @@ def get_global_css() -> str:
 
     html, body {
         font-family: var(--font-primary);
-        font-weight: 400;
+        font-weight: 300;
     }
 
     [data-testid="stAppViewContainer"] {
@@ -61,7 +61,7 @@ def get_global_css() -> str:
     /* Force Inter across Streamlit/BaseWeb widgets (keep monospace for code blocks). */
     [data-testid="stAppViewContainer"] * {
         font-family: var(--font-primary) !important;
-        font-weight: 400;
+        font-weight: 300;
     }
     [data-testid="stAppViewContainer"] code,
     [data-testid="stAppViewContainer"] pre,
@@ -82,7 +82,7 @@ def get_global_css() -> str:
     h1, h2, h3, h4, h5, h6 {
         font-family: var(--font-primary);
         color: var(--color-text-primary);
-        font-weight: 600;
+        font-weight: 500;
     }
 
     .stButton>button {
@@ -171,7 +171,7 @@ def get_global_css() -> str:
         background-color: transparent;
         border-radius: 12px 12px 0 0;
         padding: 0.7rem 1.1rem;
-        font-weight: 600;
+        font-weight: 500;
         color: var(--color-text-secondary);
     }
 
@@ -243,7 +243,7 @@ def get_global_css() -> str:
     }
 
     .pp-progress-title {
-        font-weight: 600;
+        font-weight: 500;
         letter-spacing: 0.02em;
     }
 
@@ -367,7 +367,7 @@ def get_global_css() -> str:
     }
 
     .pp-source-domain {
-        font-weight: 600;
+        font-weight: 500;
         color: var(--color-accent);
     }
 
@@ -403,7 +403,7 @@ def get_global_css() -> str:
     }
 
     .pp-source-row-domain {
-        font-weight: 600;
+        font-weight: 500;
     }
 
     .pp-source-row-title {
