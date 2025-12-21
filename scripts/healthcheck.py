@@ -32,7 +32,15 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 
 
 def get_missing_required_keys(allow_missing_secrets: bool) -> list[str]:
-    """Return missing required keys, or empty list if allow_missing_secrets is True."""
+    """Return list of required environment variable keys that are not set.
+    
+    Args:
+        allow_missing_secrets: If True, returns empty list regardless of missing keys.
+                             If False, returns list of required keys not found in environment.
+    
+    Returns:
+        List of missing required key names, or empty list if allow_missing_secrets is True.
+    """
     if allow_missing_secrets:
         return []
     return [key for key in REQUIRED_KEYS if not os.getenv(key)]

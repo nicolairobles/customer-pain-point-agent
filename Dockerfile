@@ -18,4 +18,4 @@ HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
 
 EXPOSE 8501
 
-ENTRYPOINT sh -c 'streamlit run app/streamlit_app.py --server.port=${STREAMLIT_SERVER_PORT} --server.address=0.0.0.0'
+ENTRYPOINT sh -c 'streamlit run app/streamlit_app.py --server.port=${STREAMLIT_SERVER_PORT:-8501} --server.address=0.0.0.0'
