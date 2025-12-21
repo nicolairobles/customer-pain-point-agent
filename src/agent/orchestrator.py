@@ -215,10 +215,9 @@ CRITICAL:
                 errors=list(getattr(self._telemetry_handler, "tool_errors", []) or []),
             )
             aggregated_items = aggregation_result.items
-        except Exception as exc:
+        except Exception:
             LOGGER.exception(
-                "Aggregation failed with error: %s. Proceeding with raw items.", 
-                exc
+                "Aggregation failed. Proceeding with raw items."
             )
             aggregation_result = None
         
