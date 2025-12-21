@@ -12,17 +12,17 @@ def get_global_css() -> str:
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
     :root {
-        --color-background: #fbfbfe;
-        --color-background-gradient: radial-gradient(120% 140% at 10% 0%, #ffffff 0%, #f6f7ff 42%, #f1eaff 100%);
-        --color-surface: rgba(255, 255, 255, 0.62);
-        --color-surface-muted: rgba(255, 255, 255, 0.46);
+        --color-background: #ffffff;
+        /* Keep backgrounds mostly whitespace; use a barely-there tint for depth. */
+        --color-background-gradient: linear-gradient(180deg, #ffffff 0%, #fbfbfe 100%);
+        --color-surface: rgba(255, 255, 255, 0.72);
+        --color-surface-muted: rgba(255, 255, 255, 0.60);
         --color-text-primary: #141025;
         --color-text-secondary: rgba(20, 16, 37, 0.62);
         --color-accent: #7f56d9;
         --color-accent-hover: #6a46c5;
         --color-focus: rgba(127, 86, 217, 0.35);
         --color-border: rgba(20, 16, 37, 0.10);
-        --color-neon: #22d3ee;
         --shadow-md: 0 18px 40px rgba(20, 16, 37, 0.10);
         --font-primary: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
     }
@@ -48,7 +48,11 @@ def get_global_css() -> str:
     }
 
     [data-testid="stAppViewContainer"] {
-        background: var(--color-background-gradient);
+        background: var(--color-background);
+        /* Minimalist, Attio-like depth without loud gradients. */
+        background-image:
+            radial-gradient(900px 520px at 18% 10%, rgba(127, 86, 217, 0.06) 0%, rgba(127, 86, 217, 0.0) 60%),
+            radial-gradient(900px 520px at 82% 28%, rgba(127, 86, 217, 0.04) 0%, rgba(127, 86, 217, 0.0) 62%);
         color: var(--color-text-primary);
         font-family: var(--font-primary);
         padding: 32px 48px 48px;
@@ -204,13 +208,14 @@ def get_global_css() -> str:
     }
 
     section[data-testid="stSidebar"] {
-        background: linear-gradient(180deg, rgba(255, 255, 255, 0.75) 0%, rgba(241, 234, 255, 0.65) 100%);
+        background: rgba(255, 255, 255, 0.78);
         border-right: 1px solid rgba(20, 16, 37, 0.08);
     }
 
     /* Research progress panel (Perplexity-inspired) */
     .pp-panel {
-        background: linear-gradient(135deg, rgba(127, 86, 217, 0.25) 0%, rgba(34, 211, 238, 0.22) 55%, rgba(0, 245, 255, 0.18) 100%);
+        /* Minimal gradient-border glassmorphism */
+        background: linear-gradient(135deg, rgba(127, 86, 217, 0.22) 0%, rgba(127, 86, 217, 0.06) 55%, rgba(255, 255, 255, 0.0) 100%);
         border-radius: 18px;
         padding: 1px;
         margin-bottom: 14px;
@@ -283,15 +288,15 @@ def get_global_css() -> str:
 
     @keyframes ppPulseGlow {
         0% {
-            box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.10), 0 0 0 0 rgba(127, 86, 217, 0.0);
+            box-shadow: 0 0 0 3px rgba(127, 86, 217, 0.08), 0 0 0 0 rgba(127, 86, 217, 0.0);
             border-color: rgba(127, 86, 217, 0.26);
         }
         50% {
-            box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.18), 0 0 22px rgba(127, 86, 217, 0.22);
+            box-shadow: 0 0 0 3px rgba(127, 86, 217, 0.14), 0 0 22px rgba(127, 86, 217, 0.18);
             border-color: rgba(127, 86, 217, 0.42);
         }
         100% {
-            box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.10), 0 0 0 0 rgba(127, 86, 217, 0.0);
+            box-shadow: 0 0 0 3px rgba(127, 86, 217, 0.08), 0 0 0 0 rgba(127, 86, 217, 0.0);
             border-color: rgba(127, 86, 217, 0.26);
         }
     }
@@ -306,7 +311,7 @@ def get_global_css() -> str:
             opacity: 0.55;
             box-shadow:
                 0 0 0 1px rgba(127, 86, 217, 0.18),
-                0 0 0 0 rgba(34, 211, 238, 0.0);
+                0 0 0 0 rgba(127, 86, 217, 0.0);
             transform: scale(0.98);
         }
         50% {
@@ -314,21 +319,21 @@ def get_global_css() -> str:
             box-shadow:
                 0 0 0 1px rgba(127, 86, 217, 0.34),
                 0 0 18px rgba(127, 86, 217, 0.35),
-                0 0 28px rgba(34, 211, 238, 0.45);
+                0 0 26px rgba(127, 86, 217, 0.22);
             transform: scale(1.12);
         }
         100% {
             opacity: 0.55;
             box-shadow:
                 0 0 0 1px rgba(127, 86, 217, 0.18),
-                0 0 0 0 rgba(34, 211, 238, 0.0);
+                0 0 0 0 rgba(127, 86, 217, 0.0);
             transform: scale(0.98);
         }
     }
 
     .pp-step--active .pp-step-dot {
-        background: linear-gradient(135deg, rgba(127, 86, 217, 0.85) 0%, rgba(34, 211, 238, 0.72) 100%);
-        filter: drop-shadow(0 0 10px rgba(34, 211, 238, 0.25));
+        background: linear-gradient(135deg, rgba(127, 86, 217, 0.88) 0%, rgba(127, 86, 217, 0.62) 100%);
+        filter: drop-shadow(0 0 10px rgba(127, 86, 217, 0.20));
         animation: ppDotPulse 1.15s ease-in-out infinite;
     }
 
