@@ -174,10 +174,23 @@ class CrossSourceAggregator:
         if not candidate_text:
             return None
         candidate_title = str(candidate.get("title") or candidate.get("summary") or "").lower()
+        candidate_len = len(candidate_text)
+        candidate_title_len = len(candidate_title) if candidate_title else 0
 
         for idx, item in enumerate(existing):
             existing_text = str(item.get("_normalized_text", "") or "").lower()
             if not existing_text:
+                continue
+
+            # Fast length-based upper bound: the similarity ratio cannot exceed
+            # min_len / max_len. If that is already below the threshold, skip
+            # computing the more expensive SequenceMatcher ratio.
+            existing_len = len(existing_text)
+            if existing_len == 0:
+                continue
+            max_len = max(candidate_len, existing_len)
+            min_len = min(candidate_len, existing_len)
+            if max_len > 0 and (min_len / max_len) < self.near_duplicate_threshold:
                 continue
 
             ratio = SequenceMatcher(None, candidate_text, existing_text).ratio()
@@ -186,8 +199,14 @@ class CrossSourceAggregator:
             if candidate_title:
                 existing_title = str(item.get("title") or item.get("summary") or "").lower()
                 if existing_title:
+                    existing_title_len = len(existing_title)
+                    max_title_len = max(candidate_title_len, existing_title_len)
+                    min_title_len = min(candidate_title_len, existing_title_len)
+                    title_threshold = max(self.near_duplicate_threshold - 0.1, 0.5)
+                    if max_title_len > 0 and (min_title_len / max_title_len) < title_threshold:
+                        continue
                     title_ratio = SequenceMatcher(None, candidate_title, existing_title).ratio()
-                    if title_ratio >= max(self.near_duplicate_threshold - 0.1, 0.5):
+                    if title_ratio >= title_threshold:
                         return idx
         return None
 
