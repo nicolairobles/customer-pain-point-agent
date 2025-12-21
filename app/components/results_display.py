@@ -35,11 +35,16 @@ _RESULTS_STYLE = """
 .pp-results-metrics p {
     margin: 6px 0 0;
     font-size: 1.35rem;
-    font-weight: 600;
-    background: linear-gradient(90deg, var(--color-accent) 0%, var(--color-neon) 55%, #00f5ff 100%);
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
+    font-weight: 500;
+    color: var(--color-accent);
+}
+@supports (-webkit-background-clip: text) or (background-clip: text) {
+    .pp-results-metrics p {
+        background: linear-gradient(90deg, var(--color-accent) 0%, var(--color-accent-hover) 100%);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+    }
 }
 .pp-card {
     position: relative;
