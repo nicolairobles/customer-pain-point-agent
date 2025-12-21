@@ -55,7 +55,7 @@ def get_global_css() -> str:
             radial-gradient(900px 520px at 82% 28%, rgba(127, 86, 217, 0.04) 0%, rgba(127, 86, 217, 0.0) 62%);
         color: var(--color-text-primary);
         font-family: var(--font-primary);
-        padding: 32px 48px 48px;
+        padding: 24px 48px 48px;
     }
 
     /* Force Inter across Streamlit/BaseWeb widgets (keep monospace for code blocks). */
@@ -73,6 +73,9 @@ def get_global_css() -> str:
     [data-testid="stAppViewBlockContainer"] {
         padding-top: 0;
         padding-bottom: 0;
+    }
+    [data-testid="stMainBlockContainer"] {
+        padding: 0 1.5rem 1.5rem;
     }
 
     [data-testid="stHeader"] {
@@ -153,6 +156,23 @@ def get_global_css() -> str:
 
     .stMarkdown ul {
         padding-left: 1.25rem;
+    }
+
+    .pp-wordmark {
+        font-size: 0.9rem;
+        font-weight: 500;
+        letter-spacing: 0.28em;
+        text-transform: uppercase;
+        color: var(--color-text-secondary);
+        margin: 0;
+    }
+
+    .pp-header-bar {
+        position: sticky;
+        top: 0;
+        z-index: 5;
+        padding: 8px 0 12px;
+        margin-bottom: 8px;
     }
 
     /* Forms: avoid extra border/padding causing "boxed" look */
