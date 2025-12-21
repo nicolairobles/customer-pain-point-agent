@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any, Dict, Iterable, List, Mapping, Sequence
 
 try:
@@ -13,6 +14,9 @@ except Exception:  # pragma: no cover - fallback for environments without langch
         pass
 
 from config.settings import Settings
+from src.services.aggregation import CrossSourceAggregator
+
+logger = logging.getLogger(__name__)
 
 
 def build_agent_executor(settings: Settings) -> Any:
@@ -146,6 +150,7 @@ class _AgentRunner:
         from src.agent.analyst import Analyst
         self._query_processor = QueryProcessor(settings, llm)
         self._analyst = Analyst(settings)  # Analyst creates its own LLM with max_tokens=8192
+        self._aggregator = CrossSourceAggregator(settings)
 
     def invoke(self, payload: Dict[str, Any]) -> Any:
         # 1. Analyze Query
@@ -201,6 +206,23 @@ CRITICAL:
             max_per_platform = max(1, int(getattr(self._settings.agent, "max_results_per_source", 10)))
             max_total = max_per_platform * max(1, len(self._tools))
             raw_items = _cap_tool_items(raw_items, max_per_platform=max_per_platform, max_total=max_total)
+
+        aggregation_result = None
+        aggregated_items: List[Mapping[str, Any]] = raw_items
+        try:
+            aggregation_result = self._aggregator.aggregate(
+                aggregated_items,
+                errors=list(getattr(self._telemetry_handler, "tool_errors", []) or []),
+            )
+            aggregated_items = aggregation_result.items
+        except Exception as exc:
+            logger.warning(
+                "Cross-source aggregation failed: %s: %s. Continuing with raw tool items.",
+                type(exc).__name__,
+                str(exc),
+                exc_info=True
+            )
+            aggregation_result = None
         
         # Robustly extract research output & stats
         # Case A: Legacy AgentExecutor (returns 'output' and 'intermediate_steps')
@@ -258,8 +280,8 @@ CRITICAL:
                    raw_findings = "\n\n".join(tool_outputs) + "\n\n" + str(raw_findings)
 
         pain_points: List[Dict[str, Any]] = []
-        if raw_items and self._settings.api.openai_api_key:
-            pain_points = _extract_structured_pain_points(raw_items)
+        if aggregated_items and self._settings.api.openai_api_key:
+            pain_points = _extract_structured_pain_points(aggregated_items)
         
         # 5. Invoke Analyst Agent
         analyst_input = raw_findings if raw_findings and len(str(raw_findings)) > 10 else "NO RESEARCH FINDINGS FOUND."
@@ -267,16 +289,21 @@ CRITICAL:
         
         # 6. Construct Final Result
         metadata = research_result.get("metadata", {})
-        counted_sources = max(total_sources, len(raw_items))
+        counted_sources = max(
+            total_sources,
+            aggregation_result.metadata.get("input_items", len(raw_items)) if aggregation_result else len(raw_items),
+        )
         metadata["total_sources_searched"] = metadata.get("total_sources_searched", 0) + counted_sources
         metadata["used_tools"] = self.get_used_tools()
         handler = self._telemetry_handler
         if handler is not None:
             metadata["tool_output_counts"] = dict(getattr(handler, "tool_output_counts", {}) or {})
             metadata["tool_errors"] = list(getattr(handler, "tool_errors", []) or [])
-        if raw_items:
+        if aggregation_result is not None:
+            metadata["aggregation"] = aggregation_result.metadata
+        if aggregated_items:
             counts_by_platform: Dict[str, int] = {}
-            for item in raw_items:
+            for item in aggregated_items:
                 platform = str(item.get("platform") or "unknown").strip() or "unknown"
                 counts_by_platform[platform] = counts_by_platform.get(platform, 0) + 1
             metadata["tool_item_counts_by_platform"] = counts_by_platform
@@ -439,16 +466,27 @@ def _collect_tool_items(result: Mapping[str, Any]) -> List[Mapping[str, Any]]:
 
     collected: List[Mapping[str, Any]] = []
 
+    def _add_item(raw_item: Mapping[str, Any], source_name: str | None) -> None:
+        if not isinstance(raw_item, Mapping):
+            return
+        data = dict(raw_item)
+        platform = str(data.get("platform") or data.get("source") or source_name or "unknown").strip() or "unknown"
+        data["platform"] = platform
+        data["source"] = source_name or platform
+        if "url" not in data and "permalink" in data:
+            data["url"] = data.get("permalink")
+        collected.append(data)
+
     steps = result.get("intermediate_steps", [])
     if isinstance(steps, list):
         for entry in steps:
             if not isinstance(entry, (list, tuple)) or len(entry) != 2:
                 continue
             _action, observation = entry
+            source_name = getattr(_action, "tool", None)
             if isinstance(observation, list):
                 for item in observation:
-                    if isinstance(item, Mapping):
-                        collected.append(item)
+                    _add_item(item, source_name)
 
     messages = result.get("messages", [])
     if isinstance(messages, list):
@@ -456,11 +494,11 @@ def _collect_tool_items(result: Mapping[str, Any]) -> List[Mapping[str, Any]]:
             msg_type = getattr(message, "type", None)
             if msg_type != "tool":
                 continue
+            source_name = getattr(message, "name", None)
             artifact = getattr(message, "artifact", None)
             if isinstance(artifact, list):
                 for item in artifact:
-                    if isinstance(item, Mapping):
-                        collected.append(item)
+                    _add_item(item, source_name)
 
     return collected
 
