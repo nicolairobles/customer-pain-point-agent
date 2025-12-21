@@ -4,9 +4,6 @@ from __future__ import annotations
 
 import streamlit as st
 
-_CSS_SESSION_KEY = "_global_styles_applied"
-
-
 def get_global_css() -> str:
     """Return the global CSS overrides for the Streamlit app."""
 
@@ -168,10 +165,5 @@ def get_global_css() -> str:
 
 
 def apply_global_styles() -> None:
-    """Apply the global CSS overrides once per Streamlit session."""
-
-    if st.session_state.get(_CSS_SESSION_KEY):
-        return
+    """Apply the global CSS overrides for the current render."""
     st.markdown(get_global_css(), unsafe_allow_html=True)
-    st.session_state[_CSS_SESSION_KEY] = True
-
