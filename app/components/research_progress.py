@@ -15,7 +15,6 @@ import streamlit as st
 class ProgressStep:
     key: str
     label: str
-    icon: str
 
 
 @dataclass
@@ -28,11 +27,11 @@ class _ToolState:
 
 
 _DEFAULT_STEPS: List[ProgressStep] = [
-    ProgressStep("planning", "Plan", "🧠"),
-    ProgressStep("research", "Search", "🔎"),
-    ProgressStep("dedupe", "Dedupe", "🧬"),
-    ProgressStep("extract", "Extract", "🧾"),
-    ProgressStep("synthesize", "Report", "✨"),
+    ProgressStep("planning", "Plan"),
+    ProgressStep("research", "Search"),
+    ProgressStep("dedupe", "Dedupe"),
+    ProgressStep("extract", "Extract"),
+    ProgressStep("synthesize", "Report"),
 ]
 
 
@@ -120,11 +119,10 @@ class ResearchProgressPanel:
             state = self._status_by_key.get(step.key, "pending")
             pills.append(
                 "<div class='pp-step pp-step--{state}'>"
-                "<span class='pp-step-icon'>{icon}</span>"
+                "<span class='pp-step-dot'></span>"
                 "<span class='pp-step-label'>{label}</span>"
                 "</div>".format(
                     state=_safe_text(state),
-                    icon=_safe_text(step.icon),
                     label=_safe_text(step.label),
                 )
             )
@@ -153,7 +151,6 @@ class ResearchProgressPanel:
             for source in self._recent_sources[: self._max_recent_sources]:
                 rows.append(
                     "<div class='pp-source-row'>"
-                    f"<span class='pp-source-chip'>{_safe_text(source.get('icon',''))}</span>"
                     f"<span class='pp-source-row-domain'>{_safe_text(source.get('domain',''))}</span>"
                     f"<span class='pp-source-row-title'>{_safe_text(source.get('title',''))}</span>"
                     "</div>"
@@ -284,7 +281,6 @@ class ResearchProgressPanel:
         self._is_complete = True
 
     def _ingest_sources(self, sources: List[Any], *, bucket: str | None) -> None:
-        icon = "🌐" if bucket == "web" else "💬" if bucket == "reddit" else "🔎"
         for raw in sources:
             if not isinstance(raw, Mapping):
                 continue
@@ -295,7 +291,7 @@ class ResearchProgressPanel:
             domain = _domain(url)
             if not domain:
                 continue
-            source_entry = {"domain": domain, "title": title, "icon": icon}
+            source_entry = {"domain": domain, "title": title}
             self._recent_sources = [entry for entry in self._recent_sources if entry.get("domain") != domain]
             self._recent_sources.insert(0, source_entry)
             self._recent_sources = self._recent_sources[: self._max_recent_sources]

@@ -271,13 +271,12 @@ def get_global_css() -> str:
         font-weight: 500;
     }
 
-    .pp-step-icon {
-        width: 18px;
-        height: 18px;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 14px;
+    .pp-step-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        background: rgba(20, 16, 37, 0.22);
+        box-shadow: 0 0 0 1px rgba(20, 16, 37, 0.08);
     }
 
     .pp-chips { display: none; }
@@ -300,11 +299,35 @@ def get_global_css() -> str:
     .pp-step--active {
         border-color: rgba(127, 86, 217, 0.35);
         background: linear-gradient(135deg, rgba(127, 86, 217, 0.10) 0%, rgba(34, 211, 238, 0.10) 100%);
-        animation: ppPulseGlow 1.5s ease-in-out infinite;
+    }
+
+    @keyframes ppDotPulse {
+        0% {
+            box-shadow: 0 0 0 1px rgba(127, 86, 217, 0.20), 0 0 0 0 rgba(34, 211, 238, 0.0);
+            transform: scale(1);
+        }
+        50% {
+            box-shadow: 0 0 0 1px rgba(127, 86, 217, 0.26), 0 0 16px rgba(34, 211, 238, 0.30);
+            transform: scale(1.05);
+        }
+        100% {
+            box-shadow: 0 0 0 1px rgba(127, 86, 217, 0.20), 0 0 0 0 rgba(34, 211, 238, 0.0);
+            transform: scale(1);
+        }
+    }
+
+    .pp-step--active .pp-step-dot {
+        background: linear-gradient(135deg, rgba(127, 86, 217, 0.85) 0%, rgba(34, 211, 238, 0.72) 100%);
+        animation: ppDotPulse 1.4s ease-in-out infinite;
     }
 
     .pp-step--done {
         opacity: 0.75;
+    }
+
+    .pp-step--done .pp-step-dot {
+        background: rgba(127, 86, 217, 0.65);
+        box-shadow: 0 0 0 1px rgba(127, 86, 217, 0.20);
     }
 
     .pp-progress-source {
@@ -357,21 +380,10 @@ def get_global_css() -> str:
 
     .pp-source-row {
         display: grid;
-        grid-template-columns: 26px 1fr 2fr;
+        grid-template-columns: 1fr 2fr;
         gap: 10px;
         padding: 6px 0;
         align-items: center;
-    }
-
-    .pp-source-chip {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 22px;
-        height: 22px;
-        border-radius: 8px;
-        background: rgba(127, 86, 217, 0.10);
-        border: 1px solid rgba(127, 86, 217, 0.18);
     }
 
     .pp-source-row-domain {
