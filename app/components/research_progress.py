@@ -31,7 +31,7 @@ def _platform_bucket(tool_name: str) -> str | None:
     lowered = tool_name.lower()
     if "reddit" in lowered:
         return "reddit"
-    if "google" in lowered or "search" in lowered:
+    if "google" in lowered or "search" in lowered or "web" in lowered:
         return "web"
     return None
 
@@ -59,31 +59,16 @@ class ResearchProgressPanel:
         self._max_recent_sources = max_recent_sources
         self._status_by_key: Dict[str, str] = {step.key: "pending" for step in self._steps}
         self._active_message = "Preparing…"
+        self._is_complete = False
         self._current_source: Dict[str, str] | None = None
         self._recent_sources: List[Dict[str, str]] = []
 
-        self._status_slot = st.empty()
-        self._steps_slot = st.empty()
-        self._source_slot = st.empty()
-        self._recent_slot = st.empty()
+        self._slot = st.empty()
 
         self.render()
 
     def render(self) -> None:
         """Re-render all progress UI elements."""
-
-        self._status_slot.markdown(
-            f"""
-            <div class="pp-progress">
-              <div class="pp-progress-header">
-                <div class="pp-progress-title">Research Progress</div>
-                <div class="pp-progress-eta">Estimated: 30–90s</div>
-              </div>
-              <div class="pp-progress-status">{_safe_text(self._active_message)}</div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
 
         pills: list[str] = []
         for step in self._steps:
@@ -92,41 +77,56 @@ class ResearchProgressPanel:
                 f"<div class='pp-step pp-step--{state}'><span class='pp-step-icon'>{_safe_text(step.icon)}</span>"
                 f"<span class='pp-step-label'>{_safe_text(step.label)}</span></div>"
             )
-        self._steps_slot.markdown(
-            f"<div class='pp-steps'>{''.join(pills)}</div>",
-            unsafe_allow_html=True,
-        )
 
-        if self._current_source:
+        source_html = ""
+        if self._is_complete:
+            source_html = "<div class='pp-progress-source pp-progress-source--done'>Research complete.</div>"
+        elif self._current_source:
             domain = _safe_text(self._current_source.get("domain", ""))
             title = _safe_text(self._current_source.get("title", "")) or "Reviewing source…"
-            self._source_slot.markdown(
-                f"<div class='pp-progress-source'><span class='pp-source-domain'>{domain}</span>"
-                f"<span class='pp-source-title'>{title}</span></div>",
-                unsafe_allow_html=True,
+            source_html = (
+                "<div class='pp-progress-source'>"
+                f"<span class='pp-source-domain'>{domain}</span>"
+                f"<span class='pp-source-title'>{title}</span>"
+                "</div>"
             )
         else:
-            self._source_slot.markdown(
-                "<div class='pp-progress-source pp-progress-source--empty'>Waiting for sources…</div>",
-                unsafe_allow_html=True,
-            )
+            source_html = "<div class='pp-progress-source pp-progress-source--empty'>Waiting for sources…</div>"
 
+        recent_html = ""
         if self._recent_sources:
             rows = []
             for source in self._recent_sources[: self._max_recent_sources]:
                 rows.append(
-                    f"<div class='pp-source-row'><span class='pp-source-chip'>{_safe_text(source.get('icon',''))}</span>"
+                    "<div class='pp-source-row'>"
+                    f"<span class='pp-source-chip'>{_safe_text(source.get('icon',''))}</span>"
                     f"<span class='pp-source-row-domain'>{_safe_text(source.get('domain',''))}</span>"
-                    f"<span class='pp-source-row-title'>{_safe_text(source.get('title',''))}</span></div>"
+                    f"<span class='pp-source-row-title'>{_safe_text(source.get('title',''))}</span>"
+                    "</div>"
                 )
-            self._recent_slot.markdown(
+            recent_html = (
                 "<div class='pp-sources'><div class='pp-sources-title'>Recently checked</div>"
                 + "".join(rows)
-                + "</div>",
-                unsafe_allow_html=True,
+                + "</div>"
             )
-        else:
-            self._recent_slot.empty()
+
+        self._slot.markdown(
+            f"""
+            <div class="pp-panel">
+              <div class="pp-panel-inner">
+                <div class="pp-progress-header">
+                  <div class="pp-progress-title">Research Progress</div>
+                  <div class="pp-progress-eta">Estimated: 30–90s</div>
+                </div>
+                <div class="pp-progress-status">{_safe_text(self._active_message)}</div>
+                <div class='pp-steps'>{''.join(pills)}</div>
+                {source_html}
+                {recent_html}
+              </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
     def apply_event(self, event: Mapping[str, Any]) -> None:
         """Update the panel based on a progress event emitted by the agent backend."""
@@ -138,6 +138,8 @@ class ResearchProgressPanel:
             if message:
                 self._active_message = message
             self._activate_stage(stage)
+            if stage == "complete":
+                self._mark_all_done()
             self.render()
             return
 
@@ -155,6 +157,7 @@ class ResearchProgressPanel:
 
             if event_type == "tool_start":
                 self._active_message = f"Searching {tool}…"
+                self._is_complete = False
                 self.render()
                 return
 
@@ -167,16 +170,7 @@ class ResearchProgressPanel:
             if event_type == "tool_end":
                 sources = event.get("sources") or []
                 if isinstance(sources, list) and sources:
-                    raw = sources[0]
-                    if isinstance(raw, Mapping):
-                        url = str(raw.get("url") or "")
-                        title = str(raw.get("title") or "")
-                        domain = _domain(url)
-                        if domain:
-                            icon = "🌐" if bucket == "web" else "💬"
-                            self._current_source = {"domain": domain, "title": title}
-                            self._recent_sources.insert(0, {"domain": domain, "title": title, "icon": icon})
-                            self._recent_sources = self._recent_sources[: self._max_recent_sources]
+                    self._ingest_sources(sources, bucket=bucket)
 
                 self._active_message = f"Finished {tool}."
                 self._mark_done(bucket)
@@ -201,3 +195,32 @@ class ResearchProgressPanel:
     def _mark_done(self, stage: str | None) -> None:
         if stage and stage in self._status_by_key:
             self._status_by_key[stage] = "done"
+
+    def _mark_all_done(self) -> None:
+        for key in list(self._status_by_key.keys()):
+            self._status_by_key[key] = "done"
+        self._is_complete = True
+
+    def _ingest_sources(self, sources: List[Any], *, bucket: str | None) -> None:
+        """Update current/recent sources from real tool output hints."""
+
+        icon = "🌐" if bucket == "web" else "💬" if bucket == "reddit" else "🔎"
+
+        for raw in sources:
+            if not isinstance(raw, Mapping):
+                continue
+            url = str(raw.get("url") or "")
+            if not url:
+                continue
+            title = str(raw.get("title") or "").strip()
+            domain = _domain(url)
+            if not domain:
+                continue
+            source_entry = {"domain": domain, "title": title, "icon": icon}
+            self._recent_sources = [entry for entry in self._recent_sources if entry.get("domain") != domain]
+            self._recent_sources.insert(0, source_entry)
+            self._recent_sources = self._recent_sources[: self._max_recent_sources]
+
+        if self._recent_sources:
+            top = self._recent_sources[0]
+            self._current_source = {"domain": str(top.get("domain", "")), "title": str(top.get("title", ""))}

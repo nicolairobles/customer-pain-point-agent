@@ -23,7 +23,12 @@ def test_build_metadata_summary_handles_missing_fields() -> None:
     """Missing metadata should fall back to zeroed values."""
 
     stats = results_display.build_metadata_summary({})
-    assert [stat.value for stat in stats] == ["0", "0.00s", "$0.000"]
+    assert [stat.value for stat in stats] == ["0", "0.00s"]
+
+
+def test_build_metadata_summary_hides_zero_cost() -> None:
+    stats = results_display.build_metadata_summary({"total_sources_searched": 1, "execution_time": 0.5, "api_costs": 0})
+    assert [stat.label for stat in stats] == ["Sources Searched", "Execution Time"]
 
 
 def test_normalize_pain_points_populates_defaults() -> None:

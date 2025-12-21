@@ -123,11 +123,17 @@ def build_metadata_summary(metadata: Dict[str, Any]) -> List[MetadataStat]:
     executions = metadata.get("execution_time") or metadata.get("execution_time_seconds") or 0.0
     api_costs = metadata.get("api_costs") or metadata.get("cost_usd") or 0.0
 
-    return [
+    stats = [
         MetadataStat("Sources Searched", f"{int(total_sources)}"),
         MetadataStat("Execution Time", format_duration(executions)),
-        MetadataStat("API Cost", format_currency(api_costs)),
     ]
+    try:
+        coerced = float(api_costs)
+    except (TypeError, ValueError):
+        coerced = 0.0
+    if coerced and coerced > 0:
+        stats.append(MetadataStat("API Cost", format_currency(coerced)))
+    return stats
 
 
 def _escape_markdown(text: str) -> str:

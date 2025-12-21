@@ -10,6 +10,7 @@ def get_global_css() -> str:
 
     return """
     <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
     :root {
         --color-background: #fbfbfe;
         --color-background-gradient: radial-gradient(120% 140% at 10% 0%, #ffffff 0%, #f6f7ff 42%, #f1eaff 100%);
@@ -60,6 +61,7 @@ def get_global_css() -> str:
     h1, h2, h3, h4, h5, h6 {
         font-family: var(--font-primary);
         color: var(--color-text-primary);
+        font-weight: 500;
     }
 
     .stButton>button {
@@ -165,21 +167,38 @@ def get_global_css() -> str:
         visibility: hidden;
     }
 
+    /* Hide Streamlit's built-in deploy control / toolbar affordances */
+    [data-testid="stToolbar"] {
+        display: none;
+    }
+    #MainMenu {
+        visibility: hidden;
+    }
+
     section[data-testid="stSidebar"] {
         background: linear-gradient(180deg, rgba(255, 255, 255, 0.75) 0%, rgba(241, 234, 255, 0.65) 100%);
         border-right: 1px solid rgba(20, 16, 37, 0.08);
     }
 
     /* Research progress panel (Perplexity-inspired) */
-    .pp-progress {
-        background: var(--color-surface);
+    .pp-panel {
+        background: linear-gradient(135deg, rgba(127, 86, 217, 0.25) 0%, rgba(34, 211, 238, 0.22) 55%, rgba(0, 245, 255, 0.18) 100%);
         border-radius: 18px;
-        padding: 16px 18px;
-        border: 1px solid rgba(255, 255, 255, 0.35);
-        box-shadow: var(--shadow-md);
-        backdrop-filter: blur(14px);
-        -webkit-backdrop-filter: blur(14px);
+        padding: 1px;
         margin-bottom: 14px;
+    }
+
+    .pp-panel-inner {
+        background: var(--color-surface);
+        border-radius: 17px;
+        padding: 16px 18px;
+        box-shadow: var(--shadow-md);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+    }
+
+    .pp-progress {
+        display: none;
     }
 
     .pp-progress-header {
@@ -221,6 +240,7 @@ def get_global_css() -> str:
         border: 1px solid rgba(20, 16, 37, 0.10);
         background: rgba(255, 255, 255, 0.55);
         font-size: 0.92rem;
+        font-weight: 500;
     }
 
     .pp-step--active {
@@ -246,6 +266,10 @@ def get_global_css() -> str:
     }
 
     .pp-progress-source--empty {
+        color: var(--color-text-secondary);
+    }
+
+    .pp-progress-source--done {
         color: var(--color-text-secondary);
     }
 
