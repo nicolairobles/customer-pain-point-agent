@@ -9,8 +9,10 @@ def get_global_css() -> str:
     """Return the global CSS overrides for the Streamlit app."""
 
     return """
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
     :root {
         --color-background: #fbfbfe;
         --color-background-gradient: radial-gradient(120% 140% at 10% 0%, #ffffff 0%, #f6f7ff 42%, #f1eaff 100%);
@@ -42,11 +44,28 @@ def get_global_css() -> str:
         }
     }
 
+    html, body {
+        font-family: var(--font-primary);
+        font-weight: 400;
+    }
+
     [data-testid="stAppViewContainer"] {
         background: var(--color-background-gradient);
         color: var(--color-text-primary);
         font-family: var(--font-primary);
         padding: 32px 48px 48px;
+    }
+
+    /* Force Inter across Streamlit/BaseWeb widgets (keep monospace for code blocks). */
+    [data-testid="stAppViewContainer"] * {
+        font-family: var(--font-primary) !important;
+        font-weight: 400;
+    }
+    [data-testid="stAppViewContainer"] code,
+    [data-testid="stAppViewContainer"] pre,
+    [data-testid="stAppViewContainer"] kbd,
+    [data-testid="stAppViewContainer"] samp {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
     }
 
     [data-testid="stAppViewBlockContainer"] {
@@ -61,7 +80,7 @@ def get_global_css() -> str:
     h1, h2, h3, h4, h5, h6 {
         font-family: var(--font-primary);
         color: var(--color-text-primary);
-        font-weight: 500;
+        font-weight: 600;
     }
 
     .stButton>button {
@@ -108,6 +127,7 @@ def get_global_css() -> str:
         border: 1px solid var(--color-border) !important;
         background: #ffffff !important;
         box-shadow: inset 0 1px 4px rgba(45, 27, 61, 0.05) !important;
+        font-family: var(--font-primary) !important;
     }
 
     div[data-baseweb="textarea"] > div:focus-within {
@@ -118,13 +138,14 @@ def get_global_css() -> str:
     div[data-baseweb="textarea"] textarea {
         border-radius: 18px !important;
         background: transparent !important;
+        font-family: var(--font-primary) !important;
     }
 
     div[data-baseweb="select"] > div {
         border-radius: 18px !important;
         border: 1px solid var(--color-border) !important;
         background: #ffffff !important;
-        font-family: var(--font-primary);
+        font-family: var(--font-primary) !important;
         color: var(--color-text-primary);
     }
 
@@ -243,6 +264,48 @@ def get_global_css() -> str:
         font-weight: 500;
     }
 
+    .pp-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin: 10px 0 12px;
+    }
+
+    .pp-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 10px;
+        border-radius: 999px;
+        border: 1px solid rgba(20, 16, 37, 0.10);
+        background: rgba(255, 255, 255, 0.55);
+        font-size: 0.92rem;
+        font-weight: 500;
+    }
+
+    .pp-chip--running {
+        border-color: rgba(34, 211, 238, 0.35);
+        box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.10);
+    }
+
+    .pp-chip--done {
+        opacity: 0.85;
+    }
+
+    .pp-chip--error {
+        border-color: rgba(239, 68, 68, 0.30);
+        box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.10);
+    }
+
+    .pp-chip-count {
+        padding: 2px 8px;
+        border-radius: 999px;
+        border: 1px solid rgba(20, 16, 37, 0.10);
+        background: rgba(127, 86, 217, 0.10);
+        font-size: 0.82rem;
+        font-weight: 600;
+    }
+
     .pp-step--active {
         border-color: rgba(127, 86, 217, 0.35);
         box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.12);
@@ -325,6 +388,48 @@ def get_global_css() -> str:
     }
 
     .pp-source-row-title {
+        color: var(--color-text-secondary);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .pp-activity {
+        background: rgba(255, 255, 255, 0.46);
+        border: 1px solid rgba(20, 16, 37, 0.08);
+        border-radius: 16px;
+        padding: 12px 14px;
+        margin-top: 10px;
+    }
+
+    .pp-activity-title {
+        font-size: 0.9rem;
+        color: var(--color-text-secondary);
+        margin-bottom: 8px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+    }
+
+    .pp-activity-row {
+        display: grid;
+        grid-template-columns: 22px 1fr;
+        gap: 10px;
+        padding: 6px 0;
+        align-items: center;
+    }
+
+    .pp-activity-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 22px;
+        height: 22px;
+        border-radius: 8px;
+        background: rgba(34, 211, 238, 0.10);
+        border: 1px solid rgba(34, 211, 238, 0.18);
+    }
+
+    .pp-activity-text {
         color: var(--color-text-secondary);
         overflow: hidden;
         text-overflow: ellipsis;

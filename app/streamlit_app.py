@@ -87,6 +87,7 @@ def main() -> None:
                     except Empty:
                         # Re-rendering without new events risks "fake" progress; keep the last real status.
                         pass
+                    progress_panel.tick()
                     time.sleep(0.05)
 
                 results = future.result()
