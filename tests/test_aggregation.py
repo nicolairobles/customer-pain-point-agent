@@ -140,3 +140,99 @@ def test_aggregation_performance_for_large_input():
     result = aggregator.aggregate(items)
     assert 0 < result.metadata["deduped_items"] <= 100
     assert result.metadata["processing_time_seconds"] < 2.0
+
+
+def test_source_weight_returns_reddit_weight_for_reddit_platforms():
+    settings = make_settings(reddit_source_weight=1.0)
+    aggregator = CrossSourceAggregator(settings)
+    assert aggregator._source_weight("reddit_search") == 1.0
+    assert aggregator._source_weight("Reddit_Search") == 1.0
+    assert aggregator._source_weight("REDDIT") == 1.0
+    assert aggregator._source_weight("reddit") == 1.0
+
+
+def test_source_weight_returns_google_weight_for_google_platforms():
+    settings = make_settings(google_source_weight=0.85)
+    aggregator = CrossSourceAggregator(settings)
+    assert aggregator._source_weight("google_search") == 0.85
+    assert aggregator._source_weight("Google_Search") == 0.85
+    assert aggregator._source_weight("GOOGLE") == 0.85
+    assert aggregator._source_weight("google") == 0.85
+
+
+def test_source_weight_returns_default_for_unknown_platforms():
+    settings = make_settings(default_source_weight=0.7)
+    aggregator = CrossSourceAggregator(settings)
+    assert aggregator._source_weight("twitter") == 0.7
+    assert aggregator._source_weight("linkedin") == 0.7
+    assert aggregator._source_weight("unknown_platform") == 0.7
+
+
+def test_source_weight_uses_extra_weights_when_configured():
+    agg_settings = AggregationSettings(
+        recency_weight=0.6,
+        engagement_weight=0.4,
+        max_item_age_days=365,
+        near_duplicate_threshold=0.8,
+        reddit_source_weight=1.0,
+        google_source_weight=0.85,
+        default_source_weight=0.7,
+        extra_source_weights={"twitter": 0.95, "linkedin": 0.8},
+    )
+    settings = Settings(aggregation=agg_settings)
+    aggregator = CrossSourceAggregator(settings)
+    assert aggregator._source_weight("twitter") == 0.95
+    assert aggregator._source_weight("Twitter") == 0.95
+    assert aggregator._source_weight("TWITTER") == 0.95
+    assert aggregator._source_weight("linkedin") == 0.8
+
+
+def test_source_weight_falls_back_on_invalid_extra_weight_type():
+    agg_settings = AggregationSettings(
+        recency_weight=0.6,
+        engagement_weight=0.4,
+        max_item_age_days=365,
+        near_duplicate_threshold=0.8,
+        reddit_source_weight=1.0,
+        google_source_weight=0.85,
+        default_source_weight=0.7,
+        extra_source_weights={"reddit_custom": "invalid_float"},
+    )
+    settings = Settings(aggregation=agg_settings)
+    aggregator = CrossSourceAggregator(settings)
+    # Should fall back to reddit weight since "reddit" is in the platform name
+    assert aggregator._source_weight("reddit_custom") == 1.0
+
+
+def test_source_weight_falls_back_on_extra_weight_none():
+    agg_settings = AggregationSettings(
+        recency_weight=0.6,
+        engagement_weight=0.4,
+        max_item_age_days=365,
+        near_duplicate_threshold=0.8,
+        reddit_source_weight=1.0,
+        google_source_weight=0.85,
+        default_source_weight=0.7,
+        extra_source_weights={"unknown_platform": None},
+    )
+    settings = Settings(aggregation=agg_settings)
+    aggregator = CrossSourceAggregator(settings)
+    # Should fall back to default weight
+    assert aggregator._source_weight("unknown_platform") == 0.7
+
+
+def test_source_weight_prioritizes_extra_weights_over_platform_matching():
+    agg_settings = AggregationSettings(
+        recency_weight=0.6,
+        engagement_weight=0.4,
+        max_item_age_days=365,
+        near_duplicate_threshold=0.8,
+        reddit_source_weight=1.0,
+        google_source_weight=0.85,
+        default_source_weight=0.7,
+        extra_source_weights={"reddit_custom": 0.5},
+    )
+    settings = Settings(aggregation=agg_settings)
+    aggregator = CrossSourceAggregator(settings)
+    # extra_source_weights should take priority even though "reddit" is in the name
+    assert aggregator._source_weight("reddit_custom") == 0.5
