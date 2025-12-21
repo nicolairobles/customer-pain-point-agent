@@ -91,6 +91,15 @@ def main() -> None:
                     time.sleep(0.05)
 
                 results = future.result()
+                # Flush any remaining progress events, then force a final completion render.
+                while True:
+                    try:
+                        event = progress_events.get_nowait()
+                    except Empty:
+                        break
+                    if isinstance(event, dict):
+                        progress_panel.apply_event(event)
+                progress_panel.apply_event({"type": "stage", "stage": "complete", "message": "Done."})
                 logging.info("Agent query completed. Tools used: %s", results.get("metadata", {}).get("tools_used", []))
         except ImportError as exc:
             logging.error(f"Import error: {exc}")

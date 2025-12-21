@@ -236,6 +236,12 @@ class ResearchProgressPanel:
     def _request_stage(self, stage: str, *, message: str | None) -> None:
         if not stage:
             return
+        # Completion should render immediately even if we are within the stage debounce window.
+        if stage == "complete":
+            self._pending_stage = None
+            self._pending_message = None
+            self._set_stage(stage, message=message or "Done.")
+            return
         if stage != self._current_stage and (_now() - self._stage_started_at) < self._min_stage_seconds:
             self._pending_stage = stage
             self._pending_message = message
@@ -260,6 +266,8 @@ class ResearchProgressPanel:
             self._active_message = message
 
         if stage == "complete":
+            self._pending_stage = None
+            self._pending_message = None
             self._mark_all_done()
         else:
             self._is_complete = False
