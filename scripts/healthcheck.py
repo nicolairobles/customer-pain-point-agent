@@ -1,0 +1,71 @@
+"""Simple runtime health check for the Streamlit deployment."""
+
+from __future__ import annotations
+
+import argparse
+import os
+import sys
+import urllib.request
+from typing import Sequence
+
+REQUIRED_KEYS: tuple[str, ...] = (
+    "OPENAI_API_KEY",
+    "REDDIT_CLIENT_ID",
+    "REDDIT_CLIENT_SECRET",
+    "GOOGLE_SEARCH_API_KEY",
+    "GOOGLE_SEARCH_ENGINE_ID",
+)
+OPTIONAL_KEYS: tuple[str, ...] = ("TWITTER_BEARER_TOKEN",)
+DEFAULT_URL = "http://localhost:8501/"
+
+
+def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Probe app health and required secrets.")
+    parser.add_argument("--url", default=DEFAULT_URL, help="Endpoint to probe for a 2xx/3xx response.")
+    parser.add_argument("--timeout", type=float, default=5.0, help="HTTP timeout in seconds.")
+    parser.add_argument(
+        "--allow-missing-secrets",
+        action="store_true",
+        help="Skip failing on absent API credentials (useful for CI smoke checks).",
+    )
+    return parser.parse_args(list(argv) if argv is not None else None)
+
+
+def find_missing_required_keys(allow_missing_secrets: bool) -> list[str]:
+    if allow_missing_secrets:
+        return []
+    return [key for key in REQUIRED_KEYS if not os.getenv(key)]
+
+
+def probe_url(url: str, timeout: float) -> int:
+    request = urllib.request.Request(url)
+    with urllib.request.urlopen(request, timeout=timeout) as response:
+        return response.status
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    args = parse_args(argv)
+
+    missing_keys = find_missing_required_keys(args.allow_missing_secrets)
+    if missing_keys:
+        sys.stderr.write(f"Missing required secrets: {', '.join(missing_keys)}\n")
+        sys.stderr.flush()
+        return 1
+
+    try:
+        status = probe_url(args.url, args.timeout)
+    except Exception as exc:  # noqa: BLE001
+        sys.stderr.write(f"Health probe failed: {exc}\n")
+        sys.stderr.flush()
+        return 1
+
+    if status >= 400:
+        sys.stderr.write(f"Health probe returned HTTP {status}\n")
+        sys.stderr.flush()
+        return 1
+
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
