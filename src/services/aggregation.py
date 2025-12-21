@@ -30,6 +30,7 @@ class CrossSourceAggregator:
         self.engagement_weight = getattr(agg_settings, "engagement_weight", 0.45)
         self.max_item_age_days = getattr(agg_settings, "max_item_age_days", 365)
         self.near_duplicate_threshold = getattr(agg_settings, "near_duplicate_threshold", 0.82)
+        self.engagement_scaling_factor = getattr(agg_settings, "engagement_scaling_factor", 10.0)
         self.reddit_source_weight = getattr(agg_settings, "reddit_source_weight", 1.0)
         self.google_source_weight = getattr(agg_settings, "google_source_weight", 0.9)
         self.default_source_weight = getattr(agg_settings, "default_source_weight", 0.75)
@@ -279,9 +280,19 @@ class CrossSourceAggregator:
         return votes + (comments * 0.5)
 
     def _normalize_engagement(self, engagement_signal: float) -> float:
+        """Normalize engagement signal using exponential decay.
+        
+        The scaling factor controls how quickly engagement scores saturate toward 1.0:
+        - Lower values (e.g., 5.0) cause scores to saturate faster (steep curve)
+        - Higher values (e.g., 20.0) cause scores to saturate slower (gradual curve)
+        - Default of 10.0 provides moderate saturation for typical engagement ranges
+        
+        Formula: 1.0 - exp(-engagement / scaling_factor)
+        This ensures diminishing returns for very high engagement values.
+        """
         if engagement_signal <= 0:
             return 0.0
-        return min(1.0, 1.0 - math.exp(-engagement_signal / 10.0))
+        return min(1.0, 1.0 - math.exp(-engagement_signal / self.engagement_scaling_factor))
 
     def _source_weight(self, source: str) -> float:
         platform = source.lower()
