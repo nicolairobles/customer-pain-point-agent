@@ -60,46 +60,52 @@ def _apply_example_selection() -> None:
     st.session_state[EXAMPLE_SELECT_KEY] = EXAMPLE_PLACEHOLDER
 
 
-def render_query_input() -> str:
-    """Render the query input component and return the cleaned text."""
+def render_query_presets() -> None:
+    """Render the example preset selector."""
 
-    with st.container():
-        selection = st.selectbox(
-            label="Example queries",
-            options=[EXAMPLE_PLACEHOLDER, *EXAMPLE_PROMPTS],
-            index=0,
-            key=EXAMPLE_SELECT_KEY,
-            help="Use a preset if you need a quick starting point.",
-        )
+    st.selectbox(
+        label="Example queries",
+        options=[EXAMPLE_PLACEHOLDER, *EXAMPLE_PROMPTS],
+        index=0,
+        key=EXAMPLE_SELECT_KEY,
+        on_change=_apply_example_selection,
+        help="Use a preset if you need a quick starting point.",
+    )
 
-        raw_query = st.text_area(
-            label="Describe the customer pain points you want to explore (1–50 words)",
-            key=QUERY_INPUT_KEY,
-            height=160,
-            placeholder="Example: Customers say the reporting dashboard feels slow and confusing on mobile.",
-            label_visibility="collapsed",
-        )
 
-        if selection and selection != EXAMPLE_PLACEHOLDER:
-            if not raw_query.strip():
-                st.session_state[QUERY_INPUT_KEY] = selection
-                raw_query = selection
-            st.session_state[EXAMPLE_SELECT_KEY] = EXAMPLE_PLACEHOLDER
+def render_query_text_area() -> str:
+    """Render the query text area and return the cleaned text."""
 
-        clean_query = normalize_query(raw_query)
-        word_count = count_words(clean_query)
-        st.caption(f"{word_count} / {WORD_MAX} words")
+    raw_query = st.text_area(
+        label="Describe the customer pain points you want to explore (1–50 words)",
+        key=QUERY_INPUT_KEY,
+        height=160,
+        placeholder="Example: Customers say the reporting dashboard feels slow and confusing on mobile.",
+        label_visibility="collapsed",
+    )
 
-        is_valid, error_message = validate_query(clean_query)
-        st.session_state[IS_VALID_KEY] = is_valid  # Downstream components can read this flag.
-        st.session_state[WORD_COUNT_KEY] = word_count
+    clean_query = normalize_query(raw_query)
+    word_count = count_words(clean_query)
+    st.caption(f"{word_count} / {WORD_MAX} words")
 
-        feedback = st.empty()
-        if word_count == 0:
-            feedback.info("Word limit is 1–50 words. Try a preset or describe the scenario in your own words.")
-        elif is_valid:
-            feedback.success("Ready to submit.")
-        else:
-            feedback.error(error_message)
+    is_valid, error_message = validate_query(clean_query)
+    st.session_state[IS_VALID_KEY] = is_valid  # Downstream components can read this flag.
+    st.session_state[WORD_COUNT_KEY] = word_count
+
+    feedback = st.empty()
+    if word_count == 0:
+        feedback.info("Word limit is 1–50 words. Try a preset or describe the scenario in your own words.")
+    elif is_valid:
+        feedback.success("Ready to submit.")
+    else:
+        feedback.error(error_message)
 
     return clean_query
+
+
+def render_query_input() -> str:
+    """Render the query preset selector + text area and return the cleaned text."""
+
+    with st.container():
+        render_query_presets()
+        return render_query_text_area()

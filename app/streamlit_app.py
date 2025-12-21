@@ -15,7 +15,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from src.utils.validators import ValidationError, validate_query_length
-from app.components.query_input import render_query_input
+from app.components.query_input import render_query_presets, render_query_text_area
 from app.components.results_display import render_results
 from app.theme import apply_global_styles
 from config.settings import settings
@@ -41,8 +41,10 @@ def main() -> None:
     apply_global_styles()
     st.title("Customer Pain Point Discovery Agent")
 
-    with st.form("analyze_form", clear_on_submit=False):
-        query = render_query_input()
+    render_query_presets()
+
+    with st.form("analyze_form", clear_on_submit=False, border=False):
+        query = render_query_text_area()
         submitted = st.form_submit_button("Analyze")
 
     show_debug_panel = (not settings.ui.production_mode) or settings.ui.debug_panel_enabled
