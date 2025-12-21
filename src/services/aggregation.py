@@ -288,9 +288,6 @@ class CrossSourceAggregator:
             if netloc.startswith("www."):
                 netloc = netloc[4:]
             
-            # Remove fragment
-            fragment = ""
-            
             # Sort query parameters for consistent ordering
             query = ""
             if parsed.query:

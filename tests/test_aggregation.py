@@ -316,9 +316,6 @@ def test_source_weight_platform_matching():
 
 def test_source_weight_extra_weights_configuration():
     """Test _source_weight uses extra_source_weights from configuration."""
-    # Create settings with extra_source_weights directly
-    from config.settings import AggregationSettings
-    
     agg_settings = AggregationSettings(
         recency_weight=0.6,
         engagement_weight=0.4,
@@ -343,8 +340,6 @@ def test_source_weight_extra_weights_configuration():
 
 def test_source_weight_error_handling():
     """Test _source_weight handles invalid extra_source_weights gracefully."""
-    from config.settings import AggregationSettings
-    
     # Invalid weight value that can't be converted to float
     agg_settings = AggregationSettings(
         recency_weight=0.6,
