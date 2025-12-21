@@ -12,7 +12,7 @@ An AI-powered agent that aggregates customer pain points from Reddit and Google 
 ## Getting Started
 
 ### Prerequisites
-- Python 3.11.x (project pinned to `langchain==0.0.340`; macOS users can bootstrap Miniforge and create `conda create -n cppagent-py311 python=3.11`)
+- Python 3.11.x (deployment uses `runtime.txt` and `requirements.txt` pins)
 - Access credentials for Reddit, Google Search APIs, and OpenAI
 
 ### Installation

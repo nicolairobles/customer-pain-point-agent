@@ -10,6 +10,50 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+def _coerce_truthy(value: object) -> str:
+    """Return a normalized string for boolean-like values stored in secrets."""
+
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    return str(value)
+
+
+def _load_streamlit_secrets_into_env() -> None:
+    """Best-effort load Streamlit secrets into environment variables.
+
+    Streamlit Community Cloud exposes secrets via `st.secrets`. In non-Streamlit
+    contexts this is a no-op. Environment variables take precedence if already set.
+    """
+
+    try:
+        import streamlit as st  # type: ignore
+    except Exception:
+        return
+
+    try:
+        secrets = st.secrets  # may raise if secrets provider unavailable
+    except Exception:
+        return
+
+    # `st.secrets` behaves like a mapping; values can be nested dict-like sections.
+    def ingest(prefix: str, value: object) -> None:
+        if isinstance(value, dict):
+            for child_key, child_value in value.items():
+                ingest(f"{prefix}{child_key}_" if prefix else f"{child_key}_", child_value)
+            return
+        env_key = (prefix[:-1] if prefix.endswith("_") else prefix).upper()
+        if env_key and env_key not in os.environ and value is not None:
+            os.environ[env_key] = _coerce_truthy(value)
+
+    try:
+        for key, value in dict(secrets).items():  # type: ignore[arg-type]
+            ingest(str(key), value)
+    except Exception:
+        return
+
+
+_load_streamlit_secrets_into_env()
+
 
 @dataclass(frozen=True)
 class APISettings:
