@@ -18,3 +18,14 @@
 1. Create an API key via the [Google Cloud Console](https://console.cloud.google.com/).
 2. Configure a Custom Search Engine and capture its ID.
 3. Populate `GOOGLE_SEARCH_API_KEY` and `GOOGLE_SEARCH_ENGINE_ID` in the `.env` file.
+
+### Rate Limits and Quota Considerations
+- **Daily Quota**: 100 free searches per day (shared across all Google APIs).
+- **Rate Limit**: 1 query per second (QPS) per user.
+- **Billing**: $5 per 1000 queries after free quota exhaustion.
+- **Cost Implications**: Monitor usage to avoid unexpected charges; implement caching to reduce API calls.
+
+### Best Practices
+- Use quota-safe queries in testing (e.g., limit to 1-2 results).
+- Enable billing alerts in Google Cloud Console.
+- Consider upgrading to higher quota plans for production use.

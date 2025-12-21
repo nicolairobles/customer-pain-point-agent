@@ -2,23 +2,66 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List
+import logging
+import time
+from typing import Any, Dict, List, Optional
 
+from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
 from langchain.tools import BaseTool
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
 
 from config.settings import Settings
+from src.tools.google_parser import normalize_google_result
+
+_LOG = logging.getLogger(__name__)
+
+MAX_RESULTS_PER_REQUEST = 10
+
+
+class GoogleSearchToolInput(BaseModel):
+    """Input schema for GoogleSearchTool."""
+
+    query: str = Field(..., description="Search query for Google Custom Search.")
+    num: int = Field(
+        10,
+        ge=1,
+        le=MAX_RESULTS_PER_REQUEST,
+        description=f"Number of results to return (max {MAX_RESULTS_PER_REQUEST}).",
+    )
+    lang: Optional[str] = Field(
+        default=None,
+        description="Optional language restriction (ex: 'en').",
+    )
+    site: Optional[str] = Field(
+        default=None,
+        description="Optional site restriction (ex: 'example.com').",
+    )
+
+    model_config = ConfigDict(extra="forbid")
 
 
 class GoogleSearchTool(BaseTool):
     """Fetches relevant Google Search results based on a user query."""
 
-    name = "google_search"
-    description = "Search Google for discussions related to customer pain points."
+    name: str = "google_search"
+    description: str = "Search Google for discussions related to customer pain points."
+    args_schema: type[BaseModel] = GoogleSearchToolInput
+
+    settings: Any = None
+    _client: Any = PrivateAttr(default=None)
 
     def __init__(self, settings: Settings) -> None:
-        super().__init__()
-        self.settings = settings
-        # Initialize Google Search client here when implementing
+        # Initialize pydantic/model fields via super().__init__ so assignment
+        # respects BaseTool's model semantics.
+        super().__init__(settings=settings)
+        api_key = getattr(settings.api, "google_search_api_key", "")
+        engine_id = getattr(settings.api, "google_search_engine_id", "")
+
+        if not api_key or not engine_id:
+            _LOG.warning(
+                "Google Search credentials not provided in settings; calls will return an empty result set."
+            )
 
     @classmethod
     def from_settings(cls, settings: Settings) -> "GoogleSearchTool":
@@ -26,12 +69,124 @@ class GoogleSearchTool(BaseTool):
 
         return cls(settings)
 
-    def _run(self, query: str, *args: Any, **kwargs: Any) -> List[Dict[str, Any]]:
-        """Synchronously execute the tool and return search results."""
+    def _ensure_client(self) -> Any:
+        if self._client is not None:
+            return self._client
 
-        raise NotImplementedError("GoogleSearchTool._run must be implemented")
+        api_key = getattr(self.settings.api, "google_search_api_key", "")
+        if not api_key:
+            return None
+
+        self._client = build("customsearch", "v1", developerKey=api_key)
+        return self._client
+
+    def _normalize_result(self, item: Dict[str, Any], position: int) -> Optional[Dict[str, Any]]:
+        """Normalize a Google Custom Search result using the dedicated parser."""
+        return normalize_google_result(item, position)
+
+    def _run(self, query: str, *args: Any, **kwargs: Any) -> List[Dict[str, Any]]:
+        """Synchronously execute the tool and return search results.
+
+        Expected kwargs:
+        - num: int number of results to return (default 10, max 10)
+        - lang: str language restriction (default None)
+        - site: str site restriction (default None)
+        """
+        tool_settings = getattr(self.settings, "tools", None)
+        if tool_settings is not None and not getattr(tool_settings, "google_search_enabled", True):
+            _LOG.info("GoogleSearchTool disabled by settings; returning empty results.")
+            return []
+
+        api_key = getattr(self.settings.api, "google_search_api_key", "")
+        engine_id = getattr(self.settings.api, "google_search_engine_id", "")
+        if not api_key or not engine_id:
+            _LOG.warning("Google Search credentials missing; returning empty results.")
+            return []
+
+        client = self._ensure_client()
+        if client is None:
+            _LOG.warning("Google Search client unavailable; returning empty results.")
+            return []
+
+        num_results = min(int(kwargs.get("num", MAX_RESULTS_PER_REQUEST)), MAX_RESULTS_PER_REQUEST)
+        lang = kwargs.get("lang")
+        site = kwargs.get("site")
+        
+        start_time = time.time()
+        
+        # Build search parameters
+        search_params = {
+            "q": query,
+            "cx": engine_id,
+            "num": num_results,
+        }
+        
+        if lang:
+            search_params["lr"] = f"lang_{lang}"
+        if site:
+            search_params["siteSearch"] = site
+        
+        max_retries = 3
+        backoff = 1.0
+        
+        for attempt in range(max_retries):
+            try:
+                _LOG.debug("Google Search attempt %d/%d for query: %s", attempt + 1, max_retries, query)
+                
+                response = client.cse().list(**search_params).execute()
+                
+                items = response.get("items", [])
+                normalized_results = [
+                    self._normalize_result(item, i + 1) 
+                    for i, item in enumerate(items)
+                ]
+                # Filter out None results (non-web results that were skipped)
+                normalized_results = [r for r in normalized_results if r is not None]
+                
+                duration = time.time() - start_time
+                _LOG.info(
+                    "GoogleSearchTool: returning %d results in %.2f seconds for query: %s",
+                    len(normalized_results), duration, query
+                )
+                if normalized_results:
+                    _LOG.info("GoogleSearchTool top results:")
+                    for idx, item in enumerate(normalized_results[:5], start=1):
+                        title = str(item.get("title", ""))[:90]
+                        display = str(item.get("display_url", ""))[:60]
+                        _LOG.info("  %d. [%s] %s", idx, display or "unknown", title)
+                
+                return normalized_results
+                
+            except HttpError as exc:
+                error_details = exc.error_details if hasattr(exc, "error_details") else []
+                is_quota_error = any(
+                    detail.get("reason") == "quotaExceeded" or "quota" in detail.get("message", "").lower()
+                    for detail in error_details
+                )
+                
+                if is_quota_error and attempt < max_retries - 1:
+                    _LOG.warning(
+                        "Google Search quota exceeded (attempt %d/%d), retrying in %.1f seconds: %s",
+                        attempt + 1, max_retries, backoff, exc
+                    )
+                    time.sleep(backoff)
+                    backoff *= 2
+                    continue
+                _LOG.error("Google Search API error: %s", exc)
+                return []
+            except Exception as exc:
+                _LOG.error("Unexpected error in Google Search: %s", exc)
+                if attempt < max_retries - 1:
+                    time.sleep(backoff)
+                    backoff *= 2
+                    continue
+                return []
+        
+        # This should not be reached, but just in case
+        _LOG.error("Google Search failed after %d attempts", max_retries)
+        return []
 
     async def _arun(self, query: str, *args: Any, **kwargs: Any) -> List[Dict[str, Any]]:
         """Asynchronously execute the tool and return search results."""
-
-        raise NotImplementedError("GoogleSearchTool._arun must be implemented")
+        # For now, just call the sync version since Google API client doesn't have async support
+        return self._run(query, *args, **kwargs)

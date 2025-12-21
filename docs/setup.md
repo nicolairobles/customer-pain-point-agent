@@ -1,10 +1,10 @@
 # Project Setup Guide
 
-1. Verify you are using Python 3.10+ (macOS often exposes this as `python3`):
+1. Verify you are using Python 3.11.x (the project now targets LangChain 0.0.340 which ships wheels for CPython 3.11):
    ```bash
    python --version  # or python3 --version
    ```
-   The output should be `Python 3.10.x`. If not, install or switch to the required version.
+   The output should be `Python 3.11.x`. If you are on Apple Silicon/Intel macOS and need a binary installer, you can bootstrap Miniforge and create an environment with `conda create -n cppagent-py311 python=3.11`.
 2. Create and activate a virtual environment:
    ```bash
    python -m venv .venv

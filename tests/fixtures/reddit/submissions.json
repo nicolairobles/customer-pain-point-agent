@@ -1,0 +1,33 @@
+[
+  {
+    "id": "abc123",
+    "title": "**Fixture** title with [link](https://example.com)",
+    "selftext": "Fixture body with u/example mention",
+    "score": 12,
+    "num_comments": 3,
+    "url": "https://reddit.com/r/test/abc123",
+    "permalink": "/r/test/comments/abc123/fixture/",
+    "subreddit": "test",
+    "created_utc": 1700000000,
+    "author": "fixture_author",
+    "over_18": false,
+    "spoiler": true,
+    "removed_by_category": null
+  },
+  {
+    "id": "def456",
+    "title": "Second post",
+    "selftext": "",
+    "score": 4,
+    "num_comments": 0,
+    "url": "https://reddit.com/r/test/def456",
+    "permalink": "/r/test/comments/def456/fixture/",
+    "subreddit": "test",
+    "created_utc": 1700000100,
+    "author": null,
+    "over_18": true,
+    "spoiler": false,
+    "removed_by_category": "moderator"
+  }
+]
+

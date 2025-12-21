@@ -3,12 +3,56 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Dict
 
 from dotenv import load_dotenv
 
 load_dotenv()
+
+def _coerce_truthy(value: object) -> str:
+    """Return a normalized string for boolean-like values stored in secrets."""
+
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    return str(value)
+
+
+def _load_streamlit_secrets_into_env() -> None:
+    """Best-effort load Streamlit secrets into environment variables.
+
+    Streamlit Community Cloud exposes secrets via `st.secrets`. In non-Streamlit
+    contexts this is a no-op. Environment variables take precedence if already set.
+    """
+
+    try:
+        import streamlit as st  # type: ignore
+    except Exception:
+        return
+
+    try:
+        secrets = st.secrets  # may raise if secrets provider unavailable
+    except Exception:
+        return
+
+    # `st.secrets` behaves like a mapping; values can be nested dict-like sections.
+    def ingest(prefix: str, value: object) -> None:
+        if isinstance(value, dict):
+            for child_key, child_value in value.items():
+                ingest(f"{prefix}{child_key}_" if prefix else f"{child_key}_", child_value)
+            return
+        env_key = (prefix[:-1] if prefix.endswith("_") else prefix).upper()
+        if env_key and env_key not in os.environ and value is not None:
+            os.environ[env_key] = _coerce_truthy(value)
+
+    try:
+        for key, value in dict(secrets).items():  # type: ignore[arg-type]
+            ingest(str(key), value)
+    except Exception:
+        return
+
+
+_load_streamlit_secrets_into_env()
 
 
 @dataclass(frozen=True)
@@ -18,8 +62,6 @@ class APISettings:
     openai_api_key: str = os.getenv("OPENAI_API_KEY", "")
     reddit_client_id: str = os.getenv("REDDIT_CLIENT_ID", "")
     reddit_client_secret: str = os.getenv("REDDIT_CLIENT_SECRET", "")
-    twitter_api_key: str = os.getenv("TWITTER_API_KEY", "")
-    twitter_api_secret: str = os.getenv("TWITTER_API_SECRET", "")
     google_search_api_key: str = os.getenv("GOOGLE_SEARCH_API_KEY", "")
     google_search_engine_id: str = os.getenv("GOOGLE_SEARCH_ENGINE_ID", "")
 
@@ -32,8 +74,49 @@ class AgentSettings:
     source_timeout_seconds: int = int(os.getenv("SOURCE_TIMEOUT_SECONDS", "30"))
     total_timeout_seconds: int = int(os.getenv("TOTAL_TIMEOUT_SECONDS", "120"))
     cache_enabled: bool = os.getenv("CACHE_ENABLED", "true").lower() == "true"
+    max_iterations: int = int(os.getenv("AGENT_MAX_ITERATIONS", "15"))
+    verbose: bool = os.getenv("AGENT_VERBOSE", "false").lower() == "true"
 
 
+@dataclass(frozen=True)
+class AggregationSettings:
+    """Configuration for cross-source aggregation and scoring."""
+
+    recency_weight: float = float(os.getenv("AGGREGATION_RECENCY_WEIGHT", "0.55"))
+    engagement_weight: float = float(os.getenv("AGGREGATION_ENGAGEMENT_WEIGHT", "0.45"))
+    max_item_age_days: int = int(os.getenv("AGGREGATION_MAX_ITEM_AGE_DAYS", "365"))
+    near_duplicate_threshold: float = float(os.getenv("AGGREGATION_NEAR_DUPLICATE_THRESHOLD", "0.82"))
+    comment_weight: float = float(os.getenv("AGGREGATION_COMMENT_WEIGHT", "0.5"))
+    reddit_source_weight: float = float(os.getenv("AGGREGATION_REDDIT_WEIGHT", "1.0"))
+    google_source_weight: float = float(os.getenv("AGGREGATION_GOOGLE_WEIGHT", "0.9"))
+    default_source_weight: float = float(os.getenv("AGGREGATION_DEFAULT_WEIGHT", "0.75"))
+    extra_source_weights: Dict[str, float] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        """Validate and normalize aggregation weights loaded from the environment."""
+
+        # Ensure weights are non-negative.
+        if self.recency_weight < 0 or self.engagement_weight < 0:
+            raise ValueError(
+                "Aggregation weights must be non-negative: "
+                f"recency_weight={self.recency_weight}, engagement_weight={self.engagement_weight}"
+            )
+
+        total = self.recency_weight + self.engagement_weight
+
+        # Prevent a zero or negative total, which would break normalization and scoring semantics.
+        if total <= 0:
+            raise ValueError(
+                "Sum of aggregation weights must be positive: "
+                f"recency_weight={self.recency_weight}, engagement_weight={self.engagement_weight}"
+            )
+
+        # If the weights do not sum to 1.0, normalize them so they behave as proper weights.
+        if total != 1.0:
+            normalized_recency = self.recency_weight / total
+            normalized_engagement = self.engagement_weight / total
+            object.__setattr__(self, "recency_weight", normalized_recency)
+            object.__setattr__(self, "engagement_weight", normalized_engagement)
 @dataclass(frozen=True)
 class BudgetSettings:
     """Tracks cost constraints for API usage."""
@@ -43,12 +126,44 @@ class BudgetSettings:
 
 
 @dataclass(frozen=True)
+class LLMSettings:
+    """Configuration for Large Language Model invocation."""
+
+    model: str = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+    temperature: float = float(os.getenv("OPENAI_TEMPERATURE", "0.0"))
+    max_output_tokens: int = int(os.getenv("OPENAI_MAX_OUTPUT_TOKENS", "512"))
+    request_timeout_seconds: float = float(os.getenv("OPENAI_REQUEST_TIMEOUT_SECONDS", "30"))
+    max_retry_attempts: int = int(os.getenv("OPENAI_MAX_RETRY_ATTEMPTS", "3"))
+    retry_backoff_seconds: float = float(os.getenv("OPENAI_RETRY_BACKOFF_SECONDS", "1"))
+
+
+@dataclass(frozen=True)
+class ToolSettings:
+    """Feature flags for enabling/disabling individual tools."""
+
+    reddit_enabled: bool = os.getenv("TOOL_REDDIT_ENABLED", "true").lower() == "true"
+    google_search_enabled: bool = os.getenv("TOOL_GOOGLE_SEARCH_ENABLED", "true").lower() == "true"
+
+
+@dataclass(frozen=True)
+class UISettings:
+    """Configuration for UI behavior and production gating."""
+
+    production_mode: bool = os.getenv("UI_PRODUCTION_MODE", "true").lower() == "true"
+    debug_panel_enabled: bool = os.getenv("SHOW_DEBUG_PANEL", "false").strip().lower() in {"1", "true", "yes", "on"}
+
+
+@dataclass(frozen=True)
 class Settings:
     """Aggregated application settings exposed to the rest of the codebase."""
 
     api: APISettings = APISettings()
     agent: AgentSettings = AgentSettings()
+    aggregation: AggregationSettings = AggregationSettings()
     budget: BudgetSettings = BudgetSettings()
+    llm: LLMSettings = LLMSettings()
+    tools: ToolSettings = ToolSettings()
+    ui: UISettings = UISettings()
 
 
 settings = Settings()
@@ -60,5 +175,8 @@ def to_dict() -> Dict[str, Any]:
     return {
         "api": settings.api.__dict__,
         "agent": settings.agent.__dict__,
+        "aggregation": settings.aggregation.__dict__,
         "budget": settings.budget.__dict__,
+        "llm": settings.llm.__dict__,
+        "ui": settings.ui.__dict__,
     }
