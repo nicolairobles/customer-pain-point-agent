@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from difflib import SequenceMatcher
 from typing import Any, Dict, Iterable, List, Mapping, Sequence
+from urllib.parse import parse_qs, urlparse, urlunparse
 
 from config.settings import Settings
 
@@ -240,10 +241,63 @@ class CrossSourceAggregator:
         return merged
 
     def _canonical_url(self, url: str) -> str:
-        normalized = url.strip().lower()
-        if normalized.endswith("/"):
-            normalized = normalized[:-1]
-        return normalized
+        """
+        Normalize a URL to a canonical form for duplicate detection.
+        
+        Handles:
+        - Protocol normalization (http/https -> https)
+        - www vs non-www (removes www.)
+        - Trailing slashes
+        - Case normalization
+        - Fragment identifiers (removes #fragments)
+        - Query parameter ordering (sorts parameters alphabetically)
+        """
+        if not url or not url.strip():
+            return ""
+        
+        try:
+            parsed = urlparse(url.strip())
+            
+            # Normalize scheme: default to https
+            scheme = parsed.scheme.lower() if parsed.scheme else "https"
+            if scheme in ("http", "https"):
+                scheme = "https"
+            
+            # Normalize netloc: remove www. prefix and lowercase
+            netloc = parsed.netloc.lower()
+            if netloc.startswith("www."):
+                netloc = netloc[4:]
+            
+            # Normalize path: remove trailing slash, lowercase
+            path = parsed.path.lower()
+            if path.endswith("/") and len(path) > 1:
+                path = path[:-1]
+            
+            # Normalize query: sort parameters alphabetically for consistent ordering
+            query = ""
+            if parsed.query:
+                params = parse_qs(parsed.query, keep_blank_values=True)
+                # Sort parameters and their values for consistency
+                sorted_params = sorted(params.items())
+                query_parts = []
+                for key, values in sorted_params:
+                    for value in sorted(values):
+                        query_parts.append(f"{key}={value}")
+                query = "&".join(query_parts)
+            
+            # Remove fragment (everything after #)
+            fragment = ""
+            
+            # Reconstruct the canonical URL
+            canonical = urlunparse((scheme, netloc, path, "", query, fragment))
+            return canonical
+            
+        except Exception:
+            # Fallback to simple normalization if URL parsing fails
+            normalized = url.strip().lower()
+            if normalized.endswith("/"):
+                normalized = normalized[:-1]
+            return normalized
 
     def _parse_timestamp(self, timestamp: Any) -> datetime | None:
         if timestamp in (None, "", 0):

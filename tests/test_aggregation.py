@@ -140,3 +140,158 @@ def test_aggregation_performance_for_large_input():
     result = aggregator.aggregate(items)
     assert 0 < result.metadata["deduped_items"] <= 100
     assert result.metadata["processing_time_seconds"] < 2.0
+
+
+def test_canonical_url_handles_protocol_normalization():
+    settings = make_settings()
+    aggregator = CrossSourceAggregator(settings)
+    
+    # HTTP and HTTPS should normalize to HTTPS
+    assert aggregator._canonical_url("http://example.com/page") == aggregator._canonical_url("https://example.com/page")
+    assert aggregator._canonical_url("https://example.com/page") == "https://example.com/page"
+    assert aggregator._canonical_url("http://example.com/page") == "https://example.com/page"
+
+
+def test_canonical_url_handles_www_normalization():
+    settings = make_settings()
+    aggregator = CrossSourceAggregator(settings)
+    
+    # www and non-www should normalize to non-www
+    assert aggregator._canonical_url("https://www.example.com/page") == aggregator._canonical_url("https://example.com/page")
+    assert aggregator._canonical_url("https://www.example.com/page") == "https://example.com/page"
+    assert aggregator._canonical_url("http://www.example.com/page") == "https://example.com/page"
+
+
+def test_canonical_url_handles_trailing_slashes():
+    settings = make_settings()
+    aggregator = CrossSourceAggregator(settings)
+    
+    # Trailing slashes should be removed
+    assert aggregator._canonical_url("https://example.com/page/") == aggregator._canonical_url("https://example.com/page")
+    assert aggregator._canonical_url("https://example.com/page/") == "https://example.com/page"
+    # Root path should keep the slash
+    assert aggregator._canonical_url("https://example.com/") == "https://example.com/"
+
+
+def test_canonical_url_handles_fragments():
+    settings = make_settings()
+    aggregator = CrossSourceAggregator(settings)
+    
+    # Fragment identifiers should be removed
+    assert aggregator._canonical_url("https://example.com/page#section") == aggregator._canonical_url("https://example.com/page")
+    assert aggregator._canonical_url("https://example.com/page#top") == "https://example.com/page"
+    assert aggregator._canonical_url("https://example.com/page#") == "https://example.com/page"
+
+
+def test_canonical_url_handles_query_parameter_ordering():
+    settings = make_settings()
+    aggregator = CrossSourceAggregator(settings)
+    
+    # Query parameters in different orders should normalize to same URL
+    url1 = aggregator._canonical_url("https://example.com/page?z=3&a=1&b=2")
+    url2 = aggregator._canonical_url("https://example.com/page?a=1&b=2&z=3")
+    url3 = aggregator._canonical_url("https://example.com/page?b=2&z=3&a=1")
+    assert url1 == url2 == url3
+    assert url1 == "https://example.com/page?a=1&b=2&z=3"
+
+
+def test_canonical_url_handles_case_normalization():
+    settings = make_settings()
+    aggregator = CrossSourceAggregator(settings)
+    
+    # URLs should be lowercased
+    assert aggregator._canonical_url("HTTPS://EXAMPLE.COM/PAGE") == aggregator._canonical_url("https://example.com/page")
+    assert aggregator._canonical_url("https://Example.Com/Page") == "https://example.com/page"
+
+
+def test_canonical_url_handles_combined_variations():
+    settings = make_settings()
+    aggregator = CrossSourceAggregator(settings)
+    
+    # All these variations should normalize to the same canonical URL
+    urls = [
+        "http://www.example.com/page?b=2&a=1#section",
+        "https://example.com/page/?a=1&b=2",
+        "HTTPS://WWW.EXAMPLE.COM/page?a=1&b=2#top",
+        "http://example.com/page/?b=2&a=1",
+    ]
+    canonical_urls = [aggregator._canonical_url(url) for url in urls]
+    # All should normalize to the same value
+    assert len(set(canonical_urls)) == 1
+    assert canonical_urls[0] == "https://example.com/page?a=1&b=2"
+
+
+def test_canonical_url_handles_empty_and_invalid():
+    settings = make_settings()
+    aggregator = CrossSourceAggregator(settings)
+    
+    # Empty or whitespace URLs should return empty string
+    assert aggregator._canonical_url("") == ""
+    assert aggregator._canonical_url("   ") == ""
+    
+    # Invalid URLs should fallback to simple normalization
+    result = aggregator._canonical_url("not a valid url")
+    assert isinstance(result, str)
+
+
+def test_aggregate_merges_urls_with_different_protocols():
+    settings = make_settings()
+    aggregator = CrossSourceAggregator(settings)
+    now = datetime.now(timezone.utc)
+
+    items = [
+        {
+            "id": "item-1",
+            "title": "Same article",
+            "text": "Content about the issue",
+            "url": "http://example.com/article",
+            "platform": "reddit_search",
+            "created_at": now.isoformat(),
+            "upvotes": 10,
+        },
+        {
+            "id": "item-2", 
+            "title": "Same article different protocol",
+            "text": "Content about the issue",
+            "url": "https://example.com/article",
+            "platform": "google_search",
+            "created_at": now.isoformat(),
+        },
+    ]
+
+    result = aggregator.aggregate(items)
+    # Should detect as duplicates and merge
+    assert result.metadata["deduped_by_url"] == 1
+    assert result.metadata["deduped_items"] == 1
+    assert len(result.items[0]["sources"]) == 2
+
+
+def test_aggregate_merges_urls_with_www_differences():
+    settings = make_settings()
+    aggregator = CrossSourceAggregator(settings)
+    now = datetime.now(timezone.utc)
+
+    items = [
+        {
+            "id": "item-1",
+            "title": "Article",
+            "text": "Content",
+            "url": "https://www.example.com/page",
+            "platform": "reddit_search",
+            "created_at": now.isoformat(),
+        },
+        {
+            "id": "item-2",
+            "title": "Article",
+            "text": "Content",
+            "url": "https://example.com/page",
+            "platform": "google_search",
+            "created_at": now.isoformat(),
+        },
+    ]
+
+    result = aggregator.aggregate(items)
+    # Should detect as duplicates and merge
+    assert result.metadata["deduped_by_url"] == 1
+    assert result.metadata["deduped_items"] == 1
+    assert len(result.items[0]["sources"]) == 2
