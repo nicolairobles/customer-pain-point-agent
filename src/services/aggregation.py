@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from difflib import SequenceMatcher
 from typing import Any, Dict, Iterable, List, Mapping, Sequence
+from urllib.parse import urlparse, parse_qs, urlencode
 
 from config.settings import Settings
 
@@ -272,8 +273,6 @@ class CrossSourceAggregator:
         variations. More sophisticated URL parsing (e.g., domain equivalence,
         URL shortener expansion) is not performed to keep processing fast.
         """
-        from urllib.parse import urlparse, parse_qs, urlencode
-        
         normalized = url.strip().lower()
         if not normalized:
             return ""

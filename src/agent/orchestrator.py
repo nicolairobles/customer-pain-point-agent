@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any, Dict, Iterable, List, Mapping, Sequence
 
 try:
@@ -14,6 +15,8 @@ except Exception:  # pragma: no cover - fallback for environments without langch
 
 from config.settings import Settings
 from src.services.aggregation import CrossSourceAggregator
+
+logger = logging.getLogger(__name__)
 
 
 def build_agent_executor(settings: Settings) -> Any:
@@ -213,8 +216,6 @@ CRITICAL:
             )
             aggregated_items = aggregation_result.items
         except Exception as exc:
-            import logging
-            logger = logging.getLogger(__name__)
             logger.warning(
                 "Cross-source aggregation failed: %s: %s. Continuing with raw tool items.",
                 type(exc).__name__,
