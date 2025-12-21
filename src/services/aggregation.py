@@ -276,7 +276,7 @@ class CrossSourceAggregator:
             # Normalize query: sort parameters alphabetically for consistent ordering
             query = ""
             if parsed.query:
-                params = parse_qs(parsed.query, keep_blank_values=True)
+                params = parse_qs(parsed.query, keep_blank_values=False)
                 # Sort parameters and their values for consistency
                 sorted_params = sorted(params.items())
                 query_parts = []

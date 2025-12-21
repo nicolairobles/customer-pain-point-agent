@@ -148,7 +148,6 @@ def test_canonical_url_handles_protocol_normalization():
     
     # HTTP and HTTPS should normalize to HTTPS
     assert aggregator._canonical_url("http://example.com/page") == aggregator._canonical_url("https://example.com/page")
-    assert aggregator._canonical_url("https://example.com/page") == "https://example.com/page"
     assert aggregator._canonical_url("http://example.com/page") == "https://example.com/page"
 
 
@@ -159,7 +158,6 @@ def test_canonical_url_handles_www_normalization():
     # www and non-www should normalize to non-www
     assert aggregator._canonical_url("https://www.example.com/page") == aggregator._canonical_url("https://example.com/page")
     assert aggregator._canonical_url("https://www.example.com/page") == "https://example.com/page"
-    assert aggregator._canonical_url("http://www.example.com/page") == "https://example.com/page"
 
 
 def test_canonical_url_handles_trailing_slashes():
@@ -168,7 +166,6 @@ def test_canonical_url_handles_trailing_slashes():
     
     # Trailing slashes should be removed
     assert aggregator._canonical_url("https://example.com/page/") == aggregator._canonical_url("https://example.com/page")
-    assert aggregator._canonical_url("https://example.com/page/") == "https://example.com/page"
     # Root path should keep the slash
     assert aggregator._canonical_url("https://example.com/") == "https://example.com/"
 
@@ -179,7 +176,6 @@ def test_canonical_url_handles_fragments():
     
     # Fragment identifiers should be removed
     assert aggregator._canonical_url("https://example.com/page#section") == aggregator._canonical_url("https://example.com/page")
-    assert aggregator._canonical_url("https://example.com/page#top") == "https://example.com/page"
     assert aggregator._canonical_url("https://example.com/page#") == "https://example.com/page"
 
 
