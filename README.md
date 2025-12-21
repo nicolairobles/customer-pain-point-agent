@@ -35,6 +35,11 @@ streamlit run app/streamlit_app.py
 pytest
 ```
 
+## Documentation
+- Setup: `docs/setup.md`
+- User guide: `docs/user-guide.md`
+- Deployment runbook: `docs/deployment/production-deployment.md`
+
 ## Deployment
 - **Automated (recommended):** Dispatch `Deploy Streamlit app` in GitHub Actions to build and publish a Docker image to GHCR using Python 3.11 and the pinned dependencies. Configure your host to pull `ghcr.io/<owner>/customer-pain-point-agent:<tag>` and inject secrets via environment variables (create a `.env` file from `.env.example` and use those values).
 - **Manual fallback:** `docker build -t ghcr.io/your-org/customer-pain-point-agent:manual .` then `docker run -d --env-file .env -p 8501:8501 ghcr.io/your-org/customer-pain-point-agent:manual`. For VM installs, activate a venv and run `streamlit run app/streamlit_app.py`.
