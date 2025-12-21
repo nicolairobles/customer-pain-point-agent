@@ -271,65 +271,36 @@ def get_global_css() -> str:
         font-weight: 500;
     }
 
-    .pp-step-dot {
-        width: 8px;
-        height: 8px;
-        border-radius: 999px;
-        background: rgba(20, 16, 37, 0.18);
-        box-shadow: inset 0 0 0 1px rgba(20, 16, 37, 0.12);
-    }
-
-    .pp-chips {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-        margin: 10px 0 12px;
-    }
-
-    .pp-chip {
+    .pp-step-icon {
+        width: 18px;
+        height: 18px;
         display: inline-flex;
         align-items: center;
-        gap: 8px;
-        padding: 8px 10px;
-        border-radius: 999px;
-        border: 1px solid rgba(20, 16, 37, 0.10);
-        background: rgba(255, 255, 255, 0.55);
-        font-size: 0.92rem;
-        font-weight: 500;
+        justify-content: center;
+        font-size: 14px;
     }
 
-    .pp-chip--running {
-        border-color: rgba(34, 211, 238, 0.35);
-        box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.10);
-    }
+    .pp-chips { display: none; }
 
-    .pp-chip--done {
-        opacity: 0.85;
-    }
-
-    .pp-chip--error {
-        border-color: rgba(239, 68, 68, 0.30);
-        box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.10);
-    }
-
-    .pp-chip-count {
-        padding: 2px 8px;
-        border-radius: 999px;
-        border: 1px solid rgba(20, 16, 37, 0.10);
-        background: rgba(127, 86, 217, 0.10);
-        font-size: 0.82rem;
-        font-weight: 600;
+    @keyframes ppPulseGlow {
+        0% {
+            box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.10), 0 0 0 0 rgba(127, 86, 217, 0.0);
+            border-color: rgba(127, 86, 217, 0.26);
+        }
+        50% {
+            box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.18), 0 0 22px rgba(127, 86, 217, 0.22);
+            border-color: rgba(127, 86, 217, 0.42);
+        }
+        100% {
+            box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.10), 0 0 0 0 rgba(127, 86, 217, 0.0);
+            border-color: rgba(127, 86, 217, 0.26);
+        }
     }
 
     .pp-step--active {
         border-color: rgba(127, 86, 217, 0.35);
-        box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.12);
         background: linear-gradient(135deg, rgba(127, 86, 217, 0.10) 0%, rgba(34, 211, 238, 0.10) 100%);
-    }
-
-    .pp-step--active .pp-step-dot {
-        background: var(--color-accent);
-        box-shadow: 0 0 0 3px rgba(127, 86, 217, 0.12);
+        animation: ppPulseGlow 1.5s ease-in-out infinite;
     }
 
     .pp-step--done {
@@ -414,33 +385,7 @@ def get_global_css() -> str:
         white-space: nowrap;
     }
 
-    .pp-activity {
-        background: rgba(255, 255, 255, 0.46);
-        border: 1px solid rgba(20, 16, 37, 0.08);
-        border-radius: 16px;
-        padding: 12px 14px;
-        margin-top: 10px;
-    }
-
-    .pp-activity-title {
-        font-size: 0.9rem;
-        color: var(--color-text-secondary);
-        margin-bottom: 8px;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-    }
-
-    .pp-activity-row {
-        display: block;
-        padding: 6px 0;
-    }
-
-    .pp-activity-text {
-        color: var(--color-text-secondary);
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
+    .pp-activity { display: none; }
 
     @media (max-width: 900px) {
         [data-testid="stAppViewContainer"] {
