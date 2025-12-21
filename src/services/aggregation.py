@@ -23,6 +23,12 @@ class AggregationResult:
 class CrossSourceAggregator:
     """Merge, deduplicate, and score results from multiple tools."""
 
+    # Title similarity thresholds: titles are typically shorter and more variable in
+    # phrasing than full text, so we use a more lenient threshold to avoid missing
+    # legitimate duplicates that have similar content but slightly different titles.
+    TITLE_THRESHOLD_ADJUSTMENT = 0.1  # Amount to lower threshold for title matching
+    TITLE_THRESHOLD_FLOOR = 0.5  # Minimum threshold to prevent overly permissive matching
+
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
         agg_settings = getattr(settings, "aggregation", None)
@@ -202,7 +208,10 @@ class CrossSourceAggregator:
                     existing_title_len = len(existing_title)
                     max_title_len = max(candidate_title_len, existing_title_len)
                     min_title_len = min(candidate_title_len, existing_title_len)
-                    title_threshold = max(self.near_duplicate_threshold - 0.1, 0.5)
+                    title_threshold = max(
+                        self.near_duplicate_threshold - self.TITLE_THRESHOLD_ADJUSTMENT,
+                        self.TITLE_THRESHOLD_FLOOR
+                    )
                     if max_title_len > 0 and (min_title_len / max_title_len) < title_threshold:
                         continue
                     title_ratio = SequenceMatcher(None, candidate_title, existing_title).ratio()
