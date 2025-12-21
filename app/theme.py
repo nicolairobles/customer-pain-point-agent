@@ -9,10 +9,8 @@ def get_global_css() -> str:
     """Return the global CSS overrides for the Streamlit app."""
 
     return """
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
     <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
     :root {
         --color-background: #fbfbfe;
         --color-background-gradient: radial-gradient(120% 140% at 10% 0%, #ffffff 0%, #f6f7ff 42%, #f1eaff 100%);
