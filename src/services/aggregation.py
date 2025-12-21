@@ -30,6 +30,7 @@ class CrossSourceAggregator:
         self.engagement_weight = getattr(agg_settings, "engagement_weight", 0.45)
         self.max_item_age_days = getattr(agg_settings, "max_item_age_days", 365)
         self.near_duplicate_threshold = getattr(agg_settings, "near_duplicate_threshold", 0.82)
+        self.comment_weight = getattr(agg_settings, "comment_weight", 0.5)
         self.reddit_source_weight = getattr(agg_settings, "reddit_source_weight", 1.0)
         self.google_source_weight = getattr(agg_settings, "google_source_weight", 0.9)
         self.default_source_weight = getattr(agg_settings, "default_source_weight", 0.75)
@@ -43,7 +44,7 @@ class CrossSourceAggregator:
         """Aggregate and score tool outputs.
 
         Args:
-            items: Iterable of tool results.
+            items: Sequence of tool results.
             errors: Optional list of tool error strings to track provenance failures.
         """
 
@@ -147,7 +148,14 @@ class CrossSourceAggregator:
     def _score_item(self, item: Dict[str, Any]) -> Dict[str, Any]:
         recency_score = self._calculate_recency_score(item.get("_parsed_created_at"))
         engagement_score = self._normalize_engagement(item.get("engagement_signal", 0.0))
-        base_weight = float(item.get("source_weight") or 0.0) or self.default_source_weight
+        source_weight = item.get("source_weight")
+        if source_weight is None:
+            base_weight = self.default_source_weight
+        else:
+            try:
+                base_weight = float(source_weight)
+            except (TypeError, ValueError):
+                base_weight = self.default_source_weight
 
         aggregate_score = base_weight * (
             (self.recency_weight * recency_score) + (self.engagement_weight * engagement_score)
@@ -174,10 +182,23 @@ class CrossSourceAggregator:
         if not candidate_text:
             return None
         candidate_title = str(candidate.get("title") or candidate.get("summary") or "").lower()
+        candidate_len = len(candidate_text)
+        candidate_title_len = len(candidate_title) if candidate_title else 0
 
         for idx, item in enumerate(existing):
             existing_text = str(item.get("_normalized_text", "") or "").lower()
             if not existing_text:
+                continue
+
+            # Fast length-based upper bound: the similarity ratio cannot exceed
+            # min_len / max_len. If that is already below the threshold, skip
+            # computing the more expensive SequenceMatcher ratio.
+            existing_len = len(existing_text)
+            if existing_len == 0:
+                continue
+            max_len = max(candidate_len, existing_len)
+            min_len = min(candidate_len, existing_len)
+            if max_len > 0 and (min_len / max_len) < self.near_duplicate_threshold:
                 continue
 
             ratio = SequenceMatcher(None, candidate_text, existing_text).ratio()
@@ -186,8 +207,14 @@ class CrossSourceAggregator:
             if candidate_title:
                 existing_title = str(item.get("title") or item.get("summary") or "").lower()
                 if existing_title:
+                    existing_title_len = len(existing_title)
+                    max_title_len = max(candidate_title_len, existing_title_len)
+                    min_title_len = min(candidate_title_len, existing_title_len)
+                    title_threshold = max(self.near_duplicate_threshold - 0.1, 0.5)
+                    if max_title_len > 0 and (min_title_len / max_title_len) < title_threshold:
+                        continue
                     title_ratio = SequenceMatcher(None, candidate_title, existing_title).ratio()
-                    if title_ratio >= max(self.near_duplicate_threshold - 0.1, 0.5):
+                    if title_ratio >= title_threshold:
                         return idx
         return None
 
@@ -255,9 +282,20 @@ class CrossSourceAggregator:
         return max(0.0, 1.0 - normalized_age)
 
     def _calculate_engagement(self, item: Mapping[str, Any]) -> float:
+        """Calculate engagement signal from votes and comments.
+        
+        Combines upvotes/score with comments using a configurable weight.
+        The comment_weight reflects that comments typically indicate deeper
+        engagement than votes, but may be valued differently across platforms.
+        For example, on Reddit a comment often signals strong interest, while
+        on other platforms voting might be the primary engagement mechanism.
+        
+        Default weight of 0.5 means: engagement = votes + (comments * 0.5)
+        This implies 2 comments ≈ 1 upvote in terms of engagement value.
+        """
         votes = float(item.get("upvotes") or item.get("score") or 0.0)
         comments = float(item.get("comments") or 0.0)
-        return votes + (comments * 0.5)
+        return votes + (comments * self.comment_weight)
 
     def _normalize_engagement(self, engagement_signal: float) -> float:
         if engagement_signal <= 0:
