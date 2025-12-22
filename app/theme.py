@@ -35,6 +35,7 @@ def get_global_css() -> str:
     html, body {
         font-family: var(--font-primary);
         font-weight: 300;
+        color-scheme: light;
     }
 
     [data-testid="stAppViewContainer"] {
@@ -46,6 +47,7 @@ def get_global_css() -> str:
         color: var(--color-text-primary);
         font-family: var(--font-primary);
         padding: 24px 48px 48px;
+        color-scheme: light;
     }
 
     /* Force Inter across Streamlit/BaseWeb widgets (keep monospace for code blocks). */
@@ -100,6 +102,12 @@ def get_global_css() -> str:
         outline: 3px solid var(--color-focus);
         outline-offset: 2px;
     }
+    button[data-testid^="stBaseButton-secondary"] {
+        background: #ffffff !important;
+        color: var(--color-text-primary) !important;
+        border: 1px solid var(--color-border) !important;
+        box-shadow: 0 8px 20px rgba(20, 16, 37, 0.08);
+    }
 
     .stTextInput>div>div>input, .stTextArea textarea {
         border-radius: 18px;
@@ -142,6 +150,22 @@ def get_global_css() -> str:
         background: #ffffff !important;
         font-family: var(--font-primary) !important;
         color: var(--color-text-primary);
+    }
+    div[data-baseweb="select"] input {
+        color: var(--color-text-primary) !important;
+    }
+    div[data-baseweb="popover"] {
+        background: #ffffff !important;
+        color: var(--color-text-primary) !important;
+        border-radius: 14px;
+        box-shadow: 0 14px 30px rgba(20, 16, 37, 0.10);
+    }
+    ul[role="listbox"] {
+        background: #ffffff !important;
+        color: var(--color-text-primary) !important;
+    }
+    li[role="option"] {
+        color: var(--color-text-primary) !important;
     }
 
     .stMarkdown ul {
