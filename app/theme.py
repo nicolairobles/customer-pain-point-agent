@@ -27,19 +27,9 @@ def get_global_css() -> str:
         --font-primary: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
     }
 
-    @media (prefers-color-scheme: dark) {
-        :root {
-            --color-background: #120b1d;
-            --color-background-gradient: radial-gradient(140% 120% at 10% 0%, #231432 0%, #1b0f29 45%, #130922 100%);
-            --color-surface: rgba(45, 27, 61, 0.92);
-            --color-surface-muted: rgba(45, 27, 61, 0.7);
-            --color-text-primary: #efeaf2;
-            --color-text-secondary: #c5bcd6;
-            --color-accent: #b794f6;
-            --color-accent-hover: #9f7aea;
-            --color-focus: rgba(190, 147, 247, 0.55);
-            --color-border: rgba(190, 147, 247, 0.25);
-        }
+    /* Force light-mode styling even when OS/browser prefers dark. */
+    :root {
+        color-scheme: light;
     }
 
     html, body {
