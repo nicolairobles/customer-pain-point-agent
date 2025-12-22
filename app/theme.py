@@ -160,11 +160,24 @@ def get_global_css() -> str:
         border-radius: 14px;
         box-shadow: 0 14px 30px rgba(20, 16, 37, 0.10);
     }
+    div[data-baseweb="menu"] {
+        background: #ffffff !important;
+        color: var(--color-text-primary) !important;
+    }
+    div[data-baseweb="menu"] * {
+        color: var(--color-text-primary) !important;
+    }
     ul[role="listbox"] {
         background: #ffffff !important;
         color: var(--color-text-primary) !important;
     }
     li[role="option"] {
+        color: var(--color-text-primary) !important;
+    }
+    [data-baseweb="popover"] [role="listbox"],
+    [data-baseweb="popover"] [role="option"],
+    [data-baseweb="popover"] [role="menu"] {
+        background: #ffffff !important;
         color: var(--color-text-primary) !important;
     }
 
