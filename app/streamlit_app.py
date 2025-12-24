@@ -49,6 +49,12 @@ def main() -> None:
     )
     st.title("Customer Pain Point Discovery Agent")
 
+    st.markdown(
+        "[GitHub repo](https://github.com/nicolairobles/customer-pain-point-agent) · "
+        "[Project page](https://nicolairobles.github.io/customer-pain-point-agent)",
+        help="Links to the source repository and the public project page",
+    )
+
     render_query_presets()
 
     with st.form("analyze_form", clear_on_submit=False, border=False):
