@@ -2,10 +2,11 @@
 
 An applied AI agent that turns noisy Reddit + Google chatter into validated pain points with citations. Outputs stay aligned across JSON (for automation) and narrative (for humans), and render in a Streamlit UI.
 
+**Live demo:** https://customer-pain-point-agent-7appsinnmqswszsuxgcpraf.streamlit.app/
+
+**Project page (GitHub Pages):** https://nicolairobles.github.io/customer-pain-point-agent
+
 ## Quick context
-- **Who it’s for:** PMs, researchers, hiring managers needing fast signal.
-- **What it delivers:** Deduped pain points with evidence, severity, and citations; JSON + narrative share the same sources.
-- **Runtime target:** &lt; 90s query-to-report under typical loads.
 - **Sources:** Reddit (PRAW) and Google Custom Search; feature flags let you toggle providers.
 
 ## How it works (overview)
